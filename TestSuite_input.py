@@ -1,5 +1,5 @@
 import sys, getopt
-
+#Basically we have to read a config file and write namelists accordingly
 ###############################################################################
 
 def CLI_interpreter( argv,
@@ -22,12 +22,7 @@ def CLI_interpreter( argv,
         # if the user wants help (NO arg)
         if opt in ('-h', "--help"):
             #jhan: clean up reportage
-            print 'MapMe.py -m -f <config_file> -x <field> -n<N nodes>\n'
-            print "\t -m \t Indicates mapping needs to be performed. " + \
-                   "True/False <T/F>\n"
-            print '\t -f <config_file> \n '
-            print '\t -n <N nodes> \t Number of per node files to ' +   \
-                  'concatenate \t\t '
+            print 'TestSuite.py -f <config_file>\n'
             sys.exit()
 
         # user config file (arg = <filename>) only valid from CLI
@@ -36,24 +31,7 @@ def CLI_interpreter( argv,
             # reset 1st element indicating CLI arg present
             flags.flag[0] = True
         
-        # user specify mapping requirement (True or False)
-        # trumped by config file
-        elif opt in ("-m", "--mapping" ):
-            if arg == "T" or arg == "t":
-                config.map.append(True)
-            elif arg == "F" or arg == "f":
-                config.map.append(False)
-            else:
-                print "Arg can only be T or F"
-
-
-        # Number of nodes field / mapping corresponds to
-        elif opt in ("-n", "--nodes"):
-            config.nodes = arg
-            # reset 1st element indicating CLI arg present
-            flags.flag[2] = True
-
-    print "CLI arguments Interpreted. May be overwritten by config file."
+    print "CLI requires a config file as an argument."
 
 ###############################################################################
 
@@ -62,8 +40,7 @@ def Configfile_interpreter( config,
                             flags,
                             pars ):
 
-
-    # Declare object to store lines read from config file 
+    # Declare mutable object => lines read from config file 
     lines = []
 
     npaths = 0
