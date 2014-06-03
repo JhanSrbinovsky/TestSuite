@@ -11,31 +11,6 @@
    filename%restart_in  = ' ' 
 &end 
 
-&offline_out_files
-   filename%out = ''
-   filename%log = ''
-   filename%restart_out = ''
-&end 
-
-&output_switches
-   output%restart    = .FALSE.  ! should a restart file be created?
-   output%met        = .FALSE.  ! input met data
-   output%flux       = .FALSE.  ! convective, runoff, NEE
-   output%soil       = .FALSE.  ! soil states
-   output%snow       = .FALSE.  ! snow states
-   output%radiation  = .FALSE.  ! net rad, albedo
-   output%carbon     = .FALSE.  ! NEE, GPP, NPP, stores
-   output%veg        = .FALSE.  ! vegetation states
-   output%params     = .FALSE.  ! input parameters used to produce run
-   output%balances   = .FALSE.  ! energy and water balances
-&end
-
-&check_switches
-   check%ranges     = .FALSE.    ! variable ranges, input and output
-   check%energy_bal = .FALSE.     ! energy balance
-   check%mass_bal   = .FALSE.     ! water/mass balance
-&end
-
 &casa_driver_files
    casafile%cnpipool=' *** SET PATH IN cable.nml *** '
    casafile%cnpbiome=' *** SET PATH IN cable.nml *** '
@@ -43,14 +18,6 @@
                                           ! spinning casacnp
    casafile%phen=' *** SET PATH IN cable.nml *** '
 &end
-
-&casa_out_files
-   casafile%cnpepool=''     ! end of run pool size
-   casafile%cnpmetout=''        ! output daily met forcing 
-                                          ! for spinning casacnp
-   casafile%cnpflux=''
-&end
-
 
 &gswp
    gswpfile%rainf = 'gswp/Rainf_gswp1987.nc'
@@ -69,35 +36,10 @@
                                              ! 3. Lai and Ktaul 2000 
    cable_user%DIAG_SOIL_RESP = 'ON ' 
    cable_user%LEAF_RESPIRATION = 'ON ' 
-   cable_user%RUN_DIAG_LEVEL= 'NONE'        ! 1. BASIC
-                                             ! 2. NONE
-   cable_user%CONSISTENCY_CHECK= .FALSE.      ! TRUE outputs combined fluxes at
-                                             ! each timestep for comparisson to 
-                                             ! A control run 
-   cable_user%CASA_DUMP_READ = .FALSE.       ! TRUE reads CASA forcing from
-                                             ! netcdf format
-   cable_user%CASA_DUMP_WRITE = .FALSE.      ! TRUE outputs CASA forcing in
-                                             ! netcdf format
    cable_user%SSNOW_POTEV= 'HDM'             ! Humidity Deficit Method
 &end
 
-
-&tols
-   delsoilM = 0.001   ! allowed variation in soil moisture for spin up
-   delsoilT = 0.01    ! allowed variation in soil temperature for spin up
-&end
-
-&params   
-   wiltParam = 0.5
-   satuParam = 0.8
-   fixedCO2 = 350.0   ! if not found in met file, in ppmv
-&end
-
 &model_direction
-   spincasainput = .FALSE.    ! input required to spin casacnp offline
-   spincasa      = .FALSE.    ! spin casa before running the model if TRUE, 
-                              ! and should be set to FALSE if 
-                              ! spincasainput = .TRUE.
    l_casacnp     = .FALSE.    ! using casaCNP with CABLE 
    l_laiFeedbk   = .FALSE.    ! using prognostic LAI
    l_vcmaxFeedbk = .FALSE.    ! using prognostic Vcmax
@@ -105,24 +47,9 @@
                               ! 1: Carbon only 
                               ! 2: Carbon+Nitrogen
                               ! 3: Carbon+Nitrogen+Phosphorus
-
    ncciy = 0                  ! 0: NOT gswp
                               ! Else: use 4-digit year of gswp met
-   
    redistrb = .FALSE.  ! Turn on/off the hydraulic redistribution
-
-&end
-
-!do we really need these
-&misc
-   vegparmnew  = .TRUE.  ! using new format when true
-   soilparmnew = .TRUE.  ! using new format when true
-   spinup      = .TRUE.  ! do we spin up the model?
-   verbose     = .TRUE.  ! write details of every grid cell init and params
-                         ! to log?
-   leaps       = .TRUE.  ! calculate timing with leap years?
-   !this we dont need
-   !logn        = 88      ! log file number - declared in input module
 &end
 
 
