@@ -86,6 +86,7 @@ host_vayu()
 ## raijin.nci.org.au
 host_raij()
 {
+   module load netcdf
    export NCDIR=$NETCDF_ROOT'/lib/Intel'
    export NCMOD=$NETCDF_ROOT'/include/Intel'
    export FC=$F90
@@ -288,12 +289,12 @@ build_build()
 {
    # write file for consumption by Fortran code
    # get SVN revision number 
-   echo ""
-   echo ""
-   alias svn='/opt/subversion/bin/svn'
-   echo `which svn`
-   echo ""
-   echo ""
+   #echo ""
+   #echo ""
+   ##alias svn='/opt/subversion/bin/svn'
+   ##echo `which svn`
+   #echo ""
+   #echo ""
    CABLE_REV=`svn info | grep Revis |cut -c 11-18`
    if [[ $CABLE_REV="" ]]; then
       echo "this is not an svn checkout"

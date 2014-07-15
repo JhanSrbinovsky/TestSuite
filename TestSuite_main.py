@@ -69,9 +69,9 @@ def main(argv):
    # checkout trunk (or URL to test - remove hardwiring)
    os.chdir(src)
    #use this on raijin
-   #cmd = ("/usr/bin/svn co " + SVNURL ) 
+   cmd = ("/usr/bin/svn co " + SVNURL ) 
    #jiggle
-   cmd = ("/opt/subversion/bin/svn co " + SVNURL ) 
+   #cmd = ("/opt/subversion/bin/svn co " + SVNURL ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
    
    # build models
@@ -83,6 +83,8 @@ def main(argv):
    os.chdir(offline)
    
    # serial version
+   #cmd = ("module load netcdf" ) 
+   #p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
    cmd = ("./build.ksh > " + cwd + "/log" ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
    subprocess.call("ls")
