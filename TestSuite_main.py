@@ -63,10 +63,8 @@ def main(argv):
    print "mkdir structure\n"
    cmd = ("/bin/mkdir -p " + root ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-   #p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
    cmd = ("/bin/mkdir -p " + src ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-   #p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
    
    # checkout trunk (or URL to test - remove hardwiring)
    os.chdir(src)
@@ -75,30 +73,24 @@ def main(argv):
    #jiggle
    cmd = ("/opt/subversion/bin/svn co " + SVNURL ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-   #p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
    
    # build models
    print "build model\n"
    cmd = ("/bin/cp " + cwd + "/build.ksh " + offline ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+   
    # offline
    os.chdir(offline)
    
    # serial version
-   print "\n" 
-   print "\n" 
    cmd = ("./build.ksh > " + cwd + "/log" ) 
-   print "\n" 
-   print "\n" 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
    subprocess.call("ls")
    
-   print "\n" 
-   print os.getcwd()
+   #print os.getcwd()
    sys.exit()     
-   
-   #p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
-   
+
+#wait til we are on raijin to check these builds out   
    ## parallel version
    #cmd = ("./build_mpi.ksh" ) 
    #p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
@@ -112,6 +104,10 @@ def main(argv):
   
    # once we have the lib we have to build the UM as well 
 
+
+   #run models
+#we may simply be able to use run.ksh here
+# worry about qsub later. first run on a single node   
    sys.exit()     
   
   
