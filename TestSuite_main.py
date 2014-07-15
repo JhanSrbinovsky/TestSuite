@@ -6,6 +6,7 @@ __author__ = 'Jhan Srbinovsky'
 # usage: ./TestSuite_main -f <config file>
 
 #import python modules
+import os
 import sys
 import subprocess
 
@@ -13,7 +14,7 @@ import subprocess
 from TestSuite_input import Locate_cfg, Configfile_interpreter
 
 def main(argv):
-    
+   SVNURL = "https://trac.nci.org.au/svn/cable/trunk"    
    # insert a break from the CLI for reading
    print "\n"
    
@@ -22,8 +23,6 @@ def main(argv):
    ifile = [] 
    ofile = []
    Locate_cfg( argv, ifile, ofile )
-   #print "ifile ", ifile[0] 
-   #print "ofile ", ofile[0] 
    
 ###############################################################################
    # Read config file
@@ -36,8 +35,6 @@ def main(argv):
          self.name = []
          self.path = []
    cfg = []
-   #for i in range( 1 ):   
-   #   cfg.append( Configs() )
    cfg = Configs() 
    
    # Read config file and fill cfg. class
@@ -47,43 +44,84 @@ def main(argv):
    print "Applications to be evaluated:" 
    for i in range( len( cfg.name ) ):   
       print "\n",cfg.name[i] 
-
-   # print class all at once 
-   #attrs = vars( cfg )
-   # now dump this in some way or another
-   #print ', '.join("%s: %s" % item for item in attrs.items())
-   sys.exit()
  
 ###############################################################################
-    
    
-   #execute system commands
-   print "In current format, dumped files are longitudinally complete per node."
-   print "Therefore cannot be processed by same methodi used here."
-   cmd1 = ("/bin/cp " + pars.path[0] + "/longitude001.bin " 
-          + pars.path[1] + "/longitude.bin")
-   cmd2 = ("/bin/cp "+ pars.path[0] + "/longitude001.dat " 
-          + pars.path[1] + "/longitude.dat")
+   # Execute Applications 
    
-   #subprocess.call(cmd)
-   p = subprocess.Popen(cmd1, stdout=subprocess.PIPE, shell=True)
-   (output, err) = p.communicate()
-   p = subprocess.Popen(cmd2, stdout=subprocess.PIPE, shell=True)
-   (output, err) = p.communicate()
+   print "\nSet up structure for building/running all Apps described in " + \
+   "config file. These will be cleaned up following execution of the TestSuite"
+
+   cwd = os.getcwd()
+   root = cwd + '/TestSuiteApps'
+   src = root + '/src' 
+   trunk = src + '/trunk'
+   UM = trunk + '/UM'
+   offline = trunk + '/offline'
+
+   # mkdir structure
+   print "mkdir structure\n"
+   cmd = ("/bin/mkdir -p " + root ) 
+   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+   #p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+   cmd = ("/bin/mkdir -p " + src ) 
+   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+   #p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
    
-   # Get user input from both CLI and config file
-   user_input( argv,
-               config,
-               pars,
-               fields,
-               flags )
+   # checkout trunk (or URL to test - remove hardwiring)
+   os.chdir(src)
+   #use this on raijin
+   #cmd = ("/usr/bin/svn co " + SVNURL ) 
+   #jiggle
+   cmd = ("/opt/subversion/bin/svn co " + SVNURL ) 
+   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+   #p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
    
-   # Operate on data
-   driver(     fields,
-               pars,
-               config,
-               flags )
+   # build models
+   print "build model\n"
+   cmd = ("/bin/cp " + cwd + "/build.ksh " + offline ) 
+   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+   # offline
+   os.chdir(offline)
    
+   # serial version
+   print "\n" 
+   print "\n" 
+   cmd = ("./build.ksh > " + cwd + "/log" ) 
+   print "\n" 
+   print "\n" 
+   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+   subprocess.call("ls")
+   
+   print "\n" 
+   print os.getcwd()
+   sys.exit()     
+   
+   #p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+   
+   ## parallel version
+   #cmd = ("./build_mpi.ksh" ) 
+   #p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+   ##p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+   #
+   ## UM 
+   #os.chdir(UM)
+   #cmd = ("./build.ksh" ) 
+   #p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+   ##p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+  
+   # once we have the lib we have to build the UM as well 
+
+   sys.exit()     
+  
+  
+#   for i in range( len( cfg.name ) ):   
+#      cmd = ( "./TestSuite.ksh " +  cfg.path[i] ) 
+#      p = subprocess.check_callPopen(cmd, stdout=subprocess.PIPE, shell=True)
+#     
+# 
+## here it may be easier to use ksh scripts   
+
    
    
    
