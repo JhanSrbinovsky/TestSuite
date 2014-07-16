@@ -63,7 +63,7 @@ def Configfile_interpreter( ifile, cfg ):
          # Path
          if lstr.startswith( "path" ):
             cfield = lines[ll].strip().split()
-            cfg.mode.append(cfield[1])
+            cfg.path.append(cfield[1])
       
       # End IF not comment line
 
