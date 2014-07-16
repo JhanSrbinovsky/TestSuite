@@ -1,0 +1,14 @@
+!*L----------------- COMDECK DUMP_LEN --------------------------------
+
+      INTEGER LEN_FIXHD
+      INTEGER LEN_INTHD
+      INTEGER LEN_REALHD
+      INTEGER LEN1_LEVDEPC, LEN2_LEVDEPC
+      INTEGER LEN1_ROWDEPC, LEN2_ROWDEPC
+      INTEGER LEN1_COLDEPC, LEN2_COLDEPC
+      INTEGER LEN1_FLDDEPC, LEN2_FLDDEPC
+      INTEGER LEN_EXTCNST
+      INTEGER LEN_DUMPHIST
+      INTEGER LEN_CFI1, LEN_CFI2, LEN_CFI3
+      INTEGER LEN1_LOOKUP_OBS, LEN2_LOOKUP_OBS
+!*----------------------------------------------------------------------

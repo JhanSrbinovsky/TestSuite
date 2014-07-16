@@ -1,0 +1,151 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script: convpp
+#
+#  Purpose: Converts UM atmosphere, ocean, fieldsfile or
+#           ancillary file to sequential PP format.
+#
+#  Current Owner: W Roseblade    Date: 1/02/06
+#  Reviewer: M Saunby            Date: 1/02/06
+#
+#
+#  Programming standard: UMDP 3, version 7
+#
+#  External documentation: UMDP number
+#
+#   Interface and arguments:
+# Arguments: $2, $3, $4 or $5 arguments as
+# follows:
+#      $1 (Optional)      -uSTASH        User STASHmaster supplied
+#      $2 (Optional)      USTSNUM        User STASHmaster file name
+#      $3 (Optional)      -32            Use 32-bit executable
+#      penultimate        File 1         UM file
+#      last               File 2         PP file
+#
+#   -------------------------------------------------------------------
+#   Called by: user
+#   Calls    : None
+#
+#     Imports:
+#     FILENV          - $TMPDIR/fileno
+#     TMPDIR          - temp directory
+#
+#     Exports
+#     STASHMSTR       - $UMDIR/vn$VN/ctldata/STASHmaster
+#     UNIT22          - $STASHMSTR
+#
+#
+#     Local Variables
+#     counter         - count
+#     EXEC            - $UMDIR/vn$VN/exec directory
+#     FILE1           - 1st argument to script
+#     UNIT10          - Set to either 2nd or 4th script argument
+#     USTASH          - User Stashmaster supplied
+#     USTSNUM         - User Stashmaster filename
+#     BUILD32         - Using 32-bit executable
+#     VN              - UM version
+#     PLATFORM        - Platform
+#
+# End of header -------------------------------------------------------
+#
+########################################################################
+# Step 00 - Check call syntax
+#
+set -a
+cmessage="$0: Usage is $0 -uSTASH ustsnum [-32] <file 1> <file 2>"
+if [ $# -lt 2 -o $# -gt 5 ]
+then
+  echo $cmessage
+  exit 1
+fi
+########################################################################
+# Step 0 - Initialise local variables
+#
+
+counter=0
+USTASH=n
+BUILD32=n
+
+########################################################################
+# Step 1 - Initialise environment variables
+#
+TMPDIR=$SCRATCH
+PRINT_STATUS=${PRINT_STATUS:-PrStatus_Oper}
+USTSNUM=$TMPDIR/namlst.$$
+echo " &USTSNUM">$USTSNUM
+echo " N_USTASH = 0 , NRECS_USTASH = 0 ,">>$USTSNUM
+echo " USTSFILS= ''">>$USTSNUM
+echo " /">>$USTSNUM
+########################################################################
+# Step 2 - Interpret arguments
+#
+
+cline=$*
+
+for arg in $cline
+do
+  case $arg in
+       '-uSTASH') USTASH=y ; USTSNUM=$2 ; shift 2 ;;
+           '-32') BUILD32=y ; shift 1 ;;
+              -*) echo "Error: bad arg \"$1\""
+                  echo $cmessage
+                  exit 1 ;;
+  esac
+done
+
+if [ $# -ne 2 ]; then
+  echo $cmessage; exit 1
+fi
+
+FILE1=$1
+UNIT10=$2
+
+if test ! -f "$FILE1"; then
+  echo "$FILE1 does not exist"
+  exit 1
+fi
+
+if test -f "$UNIT10"; then
+  echo "$UNIT10 exists"
+  exit 1
+fi
+########################################################################
+# Step 3 - Other environment variables
+#
+# VN here is automatically set in this script at each UM build
+VN=@vn@
+STASHMSTR=$UMDIR/vn$VN/ctldata/STASHmaster
+PLATFORM=@platform@
+TARGET_MC=@target_mc@
+if [ $BUILD32 = "y" ] ; then
+  EXEC=${EXEC:-$UMDIR/vn$VN/$TARGET_MC/exec32}
+else
+  EXEC=${EXEC:-$UMDIR/vn$VN/$TARGET_MC/exec}
+fi
+export STASHMSTR
+UNIT22=$STASHMSTR
+export UNIT22
+
+######   Platform dependent environment variables                 ######
+
+
+#
+########################################################################
+# Step 4 - Execute utility
+#
+$EXEC/convpp.exe < $USTSNUM
+CC=$?
+if [ $CC != 0 ]
+then
+echo 'Problem with CONVPP program'
+fi
+#
+########################################################################
+# Step 5 - Delete temporary files and exit
+rm $TMPDIR/namlst.$$
+exit $CC

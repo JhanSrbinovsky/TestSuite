@@ -1,0 +1,447 @@
+
+
+! *****************************COPYRIGHT*******************************
+! (C) Crown copyright Met Office. All rights reserved.
+! For further details please refer to the file COPYRIGHT.txt
+! which you should have received as part of this distribution.
+! *****************************COPYRIGHT*******************************
+!+ Parallel UM : Transform from global to local co-ordinates:
+! GLOBAL_TO_LOCAL_SUBDOMAIN: converts global subdomain boundaries
+!                            to local subdomain boundaries
+! GLOBAL_TO_LOCAL_RC: converts global row,column co-ordinates to
+!                     processor co-ordinates plus local
+!                     co-ordinates within the processor.
+!
+! Subroutine Interface:
+
+! Subroutine Interface:
+
+! Function Interface
+      INTEGER FUNCTION GET_FLD_TYPE (grid_type_code)
+
+      IMPLICIT NONE
+
+!
+! Description:
+! Takes a STASH grid type code, and returns which type of
+! grid this is - mass or wind grid.
+!
+! Current code owner : Paul Burton
+!
+! History:
+!  Model    Date     Modification history from model version 4.2
+!  version
+!  4.2      21/11/96 New deck created for mpp code.  P.Burton
+!  5.0      22/6/99  Changed field type from p,uv to p,u,v
+!  5.1      27/03/00 Deal with B-grid UV variables (for diagnostics)
+!                    Add the new LBC variables types.       P.Burton
+!  5.2      19/09/00 Added new ppx_atm_lbc_orog grid type   P.Burton
+!  5.5      10/08/00 Modification for parallelisation of WAM.
+!                 Author: Bob Carruthers, Cray UK Inc(D.Holmes-Bell)
+!  5.5      15/01/03 River routing support. P.Selwood.
+!
+! Subroutine arguments:
+
+      INTEGER                                                           &
+     &  grid_type_code     ! IN : STASH grid type code
+
+! Parameters
+!LL  Comdeck: CPPXREF --------------------------------------------------
+!LL
+!LL  Purpose: Holds PARAMETER definitions to describe the structure of
+!LL           each STASHmaster file record plus some valid entries.
+!LL
+!LL  Author    Dr T Johns
+!LL
+!LL  Model            Modification history from model version 3.0:
+!LL version  Date
+!LL  3.3   26/10/93  M. Carter. Part of an extensive mod that:
+!LL                  1.Removes the limit on primary STASH item numbers.
+!LL                  2.Removes the assumption that (section,item)
+!LL                    defines the sub-model.
+!LL                  3.Thus allows for user-prognostics.
+!LL                  Add a PPXREF record for model number.
+!LL  4.0   26/07/95  T.Johns.  Add codes for real/int/log data types.
+!LL  3.5   10/3/94   Sub-Models project:
+!LL                 List of PPXREF addressing codes augmented, in order
+!LL                 to include all of the pre_STASH master information
+!LL                 in the new PPXREF file.
+!LL                 PPXREF_CODELEN increased to 38.
+!LL                 PPXREF_IDLEN deleted - no longer relevant.
+!LL                   S.J.Swarbrick
+!LL  4.1   June 96  Wave model parameters included.
+!LL                 ppx_ address parameters adjusted to allow for
+!LL                  reading option code as 4x5 digit groups.
+!LL                   S.J.Swarbrick
+!LL  5.0   29/06/99  Add halo type parameter for new dynamics.
+!LL                  New grid codes for LAM boundary conditions
+!LL                  D.M. Goddard
+!LL  5.1   07/03/00  Fixed/Free format conversion
+!LL  5.2   19/09/00  Added ppx_atm_lbc_orog descriptor   P.Burton
+!LL  5.3   21/08/01  Added ocean lbc descriptors.   M. J. Bell
+!LL  5.3   23/07/01  Add valid pp_lbvc codes referenced in UM. R Rawlins
+!LL  5.5   30/01/03  Option code increase from 20 to 30 digits thus
+!LL                  requiring option code address range increase by
+!LL                  2 so all subsequent addressing codes need to be
+!LL                  increased by 2 to make a gap.
+!LL                  W Roseblade
+!LL
+!LL  Logical components covered: C40
+!LL
+!-----------------------------------------------------------------------
+! Primary file record definition
+      ! length of ID in a record
+      Integer, Parameter :: PPXREF_IDLEN      = 2
+
+      ! total length of characters *WARNING* must be multiple of 4
+      ! to avoid overwriting
+      Integer, Parameter :: PPXREF_CHARLEN    = 36
+
+      ! number of packing profiles
+      Integer, Parameter :: PPXREF_PACK_PROFS = 10
+
+      ! total length of codes = no. of codes (excluding profs)
+      ! + pack_profs
+      Integer, Parameter :: PPXREF_CODELEN    = 33 + PPXREF_PACK_PROFS
+
+! Derived file record sizes
+      ! Assume that an integer is at least 4 bytes long. Wastes some
+      ! space on an 8 byte machine.
+      ! ppx_charword = 9.
+      Integer, Parameter :: PPX_CHARWORD      = ((PPXREF_CHARLEN+3)/4)
+
+      ! read buffer record length
+      Integer, Parameter :: PPX_RECORDLEN = PPX_CHARWORD+PPXREF_CODELEN
+!
+!-----------------------------------------------------------------------
+! Addressing codes within PPXREF
+      Integer, Parameter ::  ppx_model_number   = 1  ! Model number
+                                                     ! address
+      Integer, Parameter ::  ppx_section_number = 2  ! Section number
+                                                     ! address
+      Integer, Parameter ::  ppx_item_number    = 3  ! Item number
+                                                     ! address
+      Integer, Parameter ::  ppx_version_mask   = 4  ! Version mask
+                                                     ! address
+      Integer, Parameter ::  ppx_space_code     = 5  ! Space code
+                                                     ! address
+      Integer, Parameter ::  ppx_timavail_code  = 6  ! Time availability
+                                                     !  code  address
+      Integer, Parameter ::  ppx_grid_type      = 7  ! Grid type code
+                                                     ! address
+      Integer, Parameter ::  ppx_lv_code        = 8  ! Level type code
+                                                     ! address
+      Integer, Parameter ::  ppx_lb_code        = 9  ! First level code
+                                                     !  address
+      Integer, Parameter ::  ppx_lt_code        =10  ! Last level code
+                                                     ! address
+      Integer, Parameter ::  ppx_lev_flag       =11  ! Level compression
+                                                     !  flag  address
+      Integer, Parameter ::  ppx_opt_code       =12  ! Sectional option
+                                                     ! code  address
+      Integer, Parameter ::  ppx_pt_code        =18  ! Pseudo dimension
+                                                     ! type  address
+      Integer, Parameter ::  ppx_pf_code        =19  ! First pseudo dim
+                                                     ! code  address
+      Integer, Parameter ::  ppx_pl_code        =20  ! Last pseudo dim
+                                                     ! code  address
+      Integer, Parameter ::  ppx_ptr_code       =21  ! Section 0 point-
+                                                     ! back code address
+      Integer, Parameter ::  ppx_dump_packing   =22  ! Dump packing code
+                                                     ! address
+      Integer, Parameter ::  ppx_lbvc_code      =23  ! PP LBVC code
+                                                     ! address
+      Integer, Parameter ::  ppx_rotate_code    =24  ! Rotation code
+                                                     ! address
+      Integer, Parameter ::  ppx_field_code     =25  ! PP field code
+                                                     ! address
+      Integer, Parameter ::  ppx_user_code      =26  ! User code address
+      Integer, Parameter ::  ppx_meto8_levelcode=27  ! CF level code
+                                                     ! address
+      Integer, Parameter ::  ppx_meto8_fieldcode=28  ! CF field code
+                                                     ! address
+      Integer, Parameter ::  ppx_cf_levelcode   =27
+      Integer, Parameter ::  ppx_cf_fieldcode   =28
+      Integer, Parameter ::  ppx_base_level     =29  ! Base level code
+                                                     ! address
+      Integer, Parameter ::  ppx_top_level      =30  ! Top level code
+                                                     ! address
+      Integer, Parameter ::  ppx_ref_lbvc_code  =31  ! Ref level LBVC
+                                                     ! code address
+      Integer, Parameter ::  ppx_data_type      =32  ! Data type code
+                                                     ! address
+      Integer, Parameter ::  ppx_halo_type      =33
+      Integer, Parameter ::  ppx_packing_acc    =34  ! Packing accuracy
+                                                     ! code  address
+      Integer, Parameter ::  ppx_pack_acc       =34  ! Must be last:
+
+
+                                                 ! multiple pack_acc to
+                                                 ! fill up remaining
+                                                 ! array elements
+
+
+!-------------------------------------------------------------------
+! Valid grid type codes
+!-------------------------------------------------------------------
+      Integer, Parameter :: ppx_atm_nonstd=0      ! Non-standard atmos
+                                                  ! grid
+      Integer, Parameter :: ppx_atm_tall=1        ! All T points (atmos)
+      Integer, Parameter :: ppx_atm_tland=2       ! Land-only T points
+                                                  ! (atmos)
+      Integer, Parameter :: ppx_atm_tsea=3        ! Sea-only T points
+                                                  ! (atmos)
+      Integer, Parameter :: ppx_atm_tzonal=4      ! Zonal field at T
+                                                  ! points  (atmos)
+      Integer, Parameter :: ppx_atm_tmerid=5      ! Merid field at T
+                                                  ! points  (atmos)
+      Integer, Parameter :: ppx_atm_uall=11       ! All u points (atmos)
+      Integer, Parameter :: ppx_atm_uland=12      ! Land-only u points
+                                                  ! (atmos)
+      Integer, Parameter :: ppx_atm_usea=13       ! Sea-only u points
+                                                  ! (atmos)
+      Integer, Parameter :: ppx_atm_uzonal=14     ! Zonal field at u
+                                                  ! points  (atmos)
+      Integer, Parameter :: ppx_atm_umerid=15     ! Merid field at u
+                                                  ! points (atmos)
+      Integer, Parameter :: ppx_atm_scalar=17     ! Scalar (atmos)
+      Integer, Parameter :: ppx_atm_cuall=18      ! All C-grid (u)
+                                                  ! points (atmos)
+      Integer, Parameter :: ppx_atm_cvall=19      ! All C-grid (v)
+                                                  ! points (atmos)
+      Integer, Parameter :: ppx_atm_compressed=21 ! Compressed land
+                                                  ! points (atmos)
+      Integer, Parameter :: ppx_atm_ozone=22      ! Field on ozone
+                                                  ! grid (atmos)
+      Integer, Parameter :: ppx_atm_river=23      ! River routing
+                                                  ! grid (atmos)
+      Integer, Parameter :: ppx_atm_rim=25        ! Rim type field
+                                                  ! (LAM BCs atmos)
+      Integer, Parameter :: ppx_atm_lbc_theta=26  ! All T points
+                                                  ! (LAM BCs atmos)
+      Integer, Parameter :: ppx_atm_lbc_u=27      ! All u points
+                                                  ! (LAM BCs atmos)
+      Integer, Parameter :: ppx_atm_lbc_v=28      ! All v points
+                                                  ! (LAM BCs atmos)
+      Integer, Parameter :: ppx_atm_lbc_orog=29   ! Orography field
+                                                  ! (LAM BCs atmos)
+      Integer, Parameter :: ppx_ocn_nonstd=30     ! Non-standard ocean
+                                                  ! grid
+      Integer, Parameter :: ppx_ocn_tcomp=31      ! Compressed T points
+                                                  !  (ocean)
+      Integer, Parameter :: ppx_ocn_ucomp=32      ! Compressed u points
+                                                  !  (ocean)
+      Integer, Parameter :: ppx_ocn_tall=36       ! All T points incl.
+                                                  ! cyclic  (ocean)
+      Integer, Parameter :: ppx_ocn_uall=37       ! All u points incl.
+                                                  ! cyclic  (ocean)
+      Integer, Parameter :: ppx_ocn_cuall=38      ! All C-grid (u)
+                                                  ! points (ocean)
+      Integer, Parameter :: ppx_ocn_cvall=39      ! All C-grid (v)
+                                                  ! points (ocean)
+      Integer, Parameter :: ppx_ocn_tfield=41     ! All non-cyclic T
+                                                  ! points  (ocean)
+      Integer, Parameter :: ppx_ocn_ufield=42     ! All non-cyclic u
+                                                  ! points  (ocean)
+      Integer, Parameter :: ppx_ocn_tzonal=43     ! Zonal n-c field at
+                                                  ! T points  (ocean)
+      Integer, Parameter :: ppx_ocn_uzonal=44     ! Zonal n-c field at
+                                                  ! u points (ocean)
+      Integer, Parameter :: ppx_ocn_tmerid=45     ! Merid n-c field at
+                                                  ! T points  (ocean)
+      Integer, Parameter :: ppx_ocn_umerid=46     ! Merid n-c field at
+                                                  ! u points  (ocean)
+      Integer, Parameter :: ppx_ocn_scalar=47     ! Scalar (ocean)
+      Integer, Parameter :: ppx_ocn_rim=51        ! Rim type field
+                                                  ! (LAM BCs ocean)
+      Integer, Parameter :: ppx_ocn_lbc_theta=52  ! Ocean rim fields
+      Integer, Parameter :: ppx_ocn_lbc_u=53      ! on T & U grids
+      Integer, Parameter :: ppx_wam_all=60        ! All points (wave
+                                                  ! model)
+      Integer, Parameter :: ppx_wam_sea=62        ! Sea points only
+                                                  ! (wave model)
+      Integer, Parameter :: ppx_wam_rim=65        ! Rim type field
+                                                  ! (LAM BCs wave)
+
+!--------------------------------------------------------------------
+! Valid rotation type codes
+!--------------------------------------------------------------------
+      Integer, Parameter :: ppx_unrotated=0       ! Unrotated output
+                                                  ! field
+      Integer, Parameter :: ppx_elf_rotated=1     ! Rotated ELF field
+
+!-------------------------------------------------------------------
+! Valid level type codes
+!-------------------------------------------------------------------
+      Integer, Parameter :: ppx_full_level=1      ! Model full level
+      Integer, Parameter :: ppx_half_level=2      ! Model half level
+      Integer, Parameter :: ppx_rho_level=1       ! Model rho level
+      Integer, Parameter :: ppx_theta_level=2     ! Model theta level
+      Integer, Parameter :: ppx_single_level=5    ! Model single level
+      Integer, Parameter :: ppx_soil_level=6      ! Deep Soil level
+
+!-------------------------------------------------------------------
+! Valid data type codes
+!-------------------------------------------------------------------
+      Integer, Parameter :: ppx_type_real=1       ! Real data type
+      Integer, Parameter :: ppx_type_int=2        ! Integer data type
+      Integer, Parameter :: ppx_type_log=3        ! Logical data type
+
+!-------------------------------------------------------------------
+! Valid meto8 level type codes
+!-------------------------------------------------------------------
+      Integer, Parameter :: ppx_meto8_surf=9999   ! MetO8 surface type
+                                                  ! code
+
+!-------------------------------------------------------------------
+! Valid dump packing codes
+!-------------------------------------------------------------------
+      Integer, Parameter :: ppx_pack_off=0        ! Field not packed
+                                                  ! (ie. 64 bit)
+      Integer, Parameter :: ppx_pack_32=-1        ! Field packed to
+                                                  ! 32 bit in  dump
+      Integer, Parameter :: ppx_pack_wgdos=1      ! Field packed by
+                                                  ! WGDOS method
+      Integer, Parameter :: ppx_pack_cfi1=11      ! Field packed using
+                                                  ! CFI1  (ocean)
+
+!-------------------------------------------------------------------
+! Add valid lbvc codes referenced in model (pp header output labels)
+!-------------------------------------------------------------------
+      Integer, Parameter :: ppx_lbvc_height  =  1 ! height
+      Integer, Parameter :: ppx_lbvc_depth   =  2 ! depth (ocean)
+      Integer, Parameter :: ppx_lbvc_pressure=  8 ! pressure
+      Integer, Parameter :: ppx_lbvc_theta   = 19 ! potential T
+      Integer, Parameter :: ppx_lbvc_hybrid  = 65 ! hybrid height(atmos)
+      Integer, Parameter :: ppx_lbvc_PV      = 82 ! potential vorticity
+      Integer, Parameter :: ppx_lbvc_surface =129 ! surface
+!========================== COMDECK PARPARM ====================
+!   Description:
+!
+!   This COMDECK contains PARAMETERs for the mpp-UM
+!
+!   Two sets of parameters are set up -
+!     i)  for the mpp-UM itself.
+!     ii) for the interface to the Message Passing Software.
+!
+      !=================================================================
+      ! Parameters needed for the mpp-UM
+      !=================================================================
+      ! maximum number of spatial dimensions
+      INTEGER,PARAMETER:: Ndim_max = 3 ! 3d data
+
+      ! number of different halo types
+      INTEGER,PARAMETER:: NHalo_max = 3 ! for N.D. atmos. model
+
+      INTEGER,PARAMETER:: halo_type_single   = 1
+      INTEGER,PARAMETER:: halo_type_extended = 2
+      INTEGER,PARAMETER:: halo_type_no_halo  = 3
+
+! FLDTYPE definitions for the different field types recognised on the
+! decomposition
+      INTEGER,PARAMETER:: Nfld_max=7 ! maximum number of field types
+      INTEGER,PARAMETER:: fld_type_p=1       ! grid on P points
+      INTEGER,PARAMETER:: fld_type_u=2       ! grid on U points
+      INTEGER,PARAMETER:: fld_type_v=3       ! grid on V points
+      INTEGER,PARAMETER:: fld_type_comp_wave  = 4
+                              ! Compressed WAM Wave Field
+      INTEGER,PARAMETER:: fld_type_full_wave  = 5
+                              ! Uncompressed WAM Wave Field
+      INTEGER,PARAMETER:: fld_type_rim_wave   = 6
+                              ! Boundary data for WAM Wave Field
+      INTEGER,PARAMETER:: fld_type_r=7       ! grid on river points
+      INTEGER,PARAMETER:: fld_type_unknown=-1! non-standard grid
+! FLDTYPE end
+
+      ! Used in addressing to indicate if calculation is for a local or
+      ! global (ie. disk dump) size
+
+      INTEGER,PARAMETER:: local_data=1
+      INTEGER,PARAMETER:: global_dump_data=2
+
+      ! maximum permitted size of a halo
+      INTEGER,PARAMETER:: Max_Halo_Size=10
+
+      !=================================================================
+      ! Parameters needed for the Message Passing Software
+      !=================================================================
+      INTEGER,PARAMETER:: Maxproc = 512 ! Max number of processors
+
+      ! Processor addresses in the neighbour array
+      INTEGER,PARAMETER:: PNorth   = 1
+      INTEGER,PARAMETER:: PEast    = 2
+      INTEGER,PARAMETER:: PSouth   = 3
+      INTEGER,PARAMETER:: PWest    = 4
+
+      ! Value in neighbour array if the domain has  no neighbour in this
+      ! direction. Otherwise the value will be the tid of the neighbor
+      INTEGER,PARAMETER:: NoDomain = -1
+
+      INTEGER,PARAMETER:: BC_STATIC   = 1 ! Static boundary conditions
+      INTEGER,PARAMETER:: BC_CYCLIC   = 2 ! Cyclic boundary conditions
+      INTEGER,PARAMETER:: BC_OVERPOLE = 3 ! Transfer over pole
+! PARPARM end
+
+      IF ( (grid_type_code  ==  ppx_atm_tall) .OR.                      &
+     &     (grid_type_code  ==  ppx_atm_tland) .OR.                     &
+     &     (grid_type_code  ==  ppx_atm_tsea) .OR.                      &
+     &     (grid_type_code  ==  ppx_atm_tzonal) .OR.                    &
+     &     (grid_type_code  ==  ppx_atm_tmerid) .OR.                    &
+     &     (grid_type_code  ==  ppx_atm_compressed) .OR.                &
+     &     (grid_type_code  ==  ppx_atm_ozone) .OR.                     &
+     &     (grid_type_code  ==  ppx_ocn_tall)    .OR.                   &
+     &     (grid_type_code  ==  ppx_ocn_tfield)  .OR.                   &
+     &     (grid_type_code  ==  ppx_ocn_tzonal)  .OR.                   &
+     &     (grid_type_code  ==  ppx_atm_lbc_theta)  .OR.                &
+     &     (grid_type_code  ==  ppx_atm_lbc_orog)  .OR.                 &
+     &     (grid_type_code  ==  ppx_ocn_lbc_theta)  .OR.                &
+     &     (grid_type_code  ==  ppx_wam_all) .OR.                       &
+     &     (grid_type_code  ==  ppx_ocn_tmerid) ) THEN
+        GET_FLD_TYPE=fld_type_p
+      ELSEIF                                                            &
+     &   ( (grid_type_code  ==  ppx_atm_cuall) .OR.                     &
+     &     (grid_type_code  ==  ppx_ocn_uall) .OR.                      &
+     &     (grid_type_code  ==  ppx_ocn_cuall) .OR.                     &
+     &     (grid_type_code  ==  ppx_ocn_ufield) .OR.                    &
+     &     (grid_type_code  ==  ppx_ocn_uzonal) .OR.                    &
+     &     (grid_type_code  ==  ppx_atm_lbc_u)  .OR.                    &
+     &     (grid_type_code  ==  ppx_ocn_lbc_u)  .OR.                    &
+     &     (grid_type_code  ==  ppx_ocn_umerid) ) THEN
+        GET_FLD_TYPE=fld_type_u
+      ELSEIF                                                            &
+     &   ( (grid_type_code  ==  ppx_atm_cvall) .OR.                     &
+     &     (grid_type_code  ==  ppx_atm_lbc_v)  .OR.                    &
+     &     (grid_type_code  ==  ppx_atm_uall ) .OR.                     &
+     &     (grid_type_code  ==  ppx_ocn_cvall) ) THEN
+        GET_FLD_TYPE=fld_type_v
+      ELSEIF                                                            &
+     &   ( (grid_type_code  ==  ppx_atm_uall) .OR.                      &
+     &     (grid_type_code  ==  ppx_atm_uland) .OR.                     &
+     &     (grid_type_code  ==  ppx_atm_usea) .OR.                      &
+     &     (grid_type_code  ==  ppx_atm_uzonal) .OR.                    &
+     &     (grid_type_code  ==  ppx_atm_umerid) .OR.                    &
+     &     (grid_type_code  ==  ppx_ocn_uall) .OR.                      &
+     &     (grid_type_code  ==  ppx_ocn_ufield) .OR.                    &
+     &     (grid_type_code  ==  ppx_ocn_uzonal) .OR.                    &
+     &     (grid_type_code  ==  ppx_ocn_umerid) ) THEN
+        GET_FLD_TYPE=fld_type_v  ! This is actually the B U/V (velocity)
+                                 ! grid, but it has the same sizes as
+                                 ! the C V grid.
+      ELSEIF                                                            &
+     &     (grid_type_code  ==  ppx_wam_sea) THEN
+        GET_FLD_TYPE=fld_type_comp_wave
+      ELSEIF                                                            &
+     &     (grid_type_code  ==  ppx_wam_rim) THEN
+        GET_FLD_TYPE=fld_type_rim_wave
+      ELSEIF                                                            &
+     &   ( (grid_type_code  ==  ppx_atm_river) ) THEN
+        GET_FLD_TYPE=fld_type_r  ! River routing grid
+
+      ELSE
+        GET_FLD_TYPE=fld_type_unknown
+      ENDIF
+
+      RETURN
+
+      END FUNCTION GET_FLD_TYPE
+

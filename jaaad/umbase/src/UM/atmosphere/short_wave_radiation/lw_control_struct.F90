@@ -1,0 +1,44 @@
+#if defined(A70_1C) || defined(A70_1Z) \
+ || defined(A01_3C) || defined(A02_3C) \
+ || defined(A01_3Z) || defined(A02_3Z)
+! *****************************COPYRIGHT*******************************
+! (C) Crown copyright Met Office. All rights reserved.
+! For further details please refer to the file COPYRIGHT.txt
+! which you should have received as part of this distribution.
+! *****************************COPYRIGHT*******************************
+!
+! Description:
+!   This module defines the controlling structure for LW calculations
+!   and perfroems suitable default initializations.
+!
+! Current Code Owner: J.-C. Thelen
+!
+! History:
+! Version   Date     Comment
+! -------   ----     -------
+!   6.2   20/08/04   Original code.
+!                        J.-C. Thelen
+!
+! Code Description:
+!   Language: FORTRAN 90
+!
+!- End of header
+!
+MODULE lw_control_struct
+!
+!
+  USE max_calls
+  USE control_struc
+!
+!
+  TYPE (control_option), Dimension(npd_lwcall) :: lw_control
+!
+  INTEGER :: n_lwcall
+!   The number of LW calls to the radiation
+!
+END MODULE lw_control_struct
+!
+!   Subroutine to set the default values of the control structure.
+!
+!
+#endif

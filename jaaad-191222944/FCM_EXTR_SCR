@@ -1,0 +1,102 @@
+#!/bin/ksh
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Set environment variables required in container & job config
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+export RUNID=jaaad
+export RUN_ON=raijin.nci.org.au
+export USERID=jxs599
+
+export UM_SVN_URL=fcm:um_br/dev/Share/VN7.3_local_changes
+export UM_SVN_BIND=$UM_SVN_URL/src/configs/bindings
+export UM_CONTAINER=$UM_SVN_BIND/container.cfg
+
+export UM_MAINDIR=/data/flush/srb001/UM_OUTDIR/$RUNID
+export UM_RMAINDIR=/short/p66/jxs599/UM_ROUTDIR/$USERID/$RUNID
+export UM_RHOST=raijin.nci.org.au
+export UM_OUTDIR=/data/flush/srb001/UM_OUTDIR/$RUNID
+export UM_ROUTDIR=/short/p66/jxs599/UM_ROUTDIR/$USERID/$RUNID
+export UM_MACHINE=nci-raijin
+export UM_VERSION=vn7.3
+
+export UM_USR_MACH_OVRDS=/dev/null
+export UM_USR_FILE_OVRDS=/dev/null
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Create extract directories
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+if test ! -d $UM_OUTDIR/umbase; then
+   echo "Creating directory $UM_OUTDIR/umbase"
+   mkdir -p $UM_OUTDIR/umbase
+fi
+
+# For UM model and Reconfiguration 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+if test ! -d $UM_OUTDIR/ummodel; then
+   echo "Creating directory $UM_OUTDIR/ummodel"
+   mkdir -p $UM_OUTDIR/ummodel
+fi
+
+if test ! -d $UM_OUTDIR/umrecon; then
+   echo "Creating directory $UM_OUTDIR/umrecon"
+   mkdir -p $UM_OUTDIR/umrecon
+fi
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Create fcm extract statement(s)
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# For UM model and Reconfiguration 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Base extract: 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+export UM_OUTDIR=$UM_MAINDIR/umbase
+export UM_ROUTDIR=$UM_RMAINDIR/umbase
+export UM_JOB_CFG=/home/cmar/srb001/umui_jobs/$RUNID/FCM_UMUI_BASE_CFG
+fcm extract  -v 3 $UM_SVN_BIND/container.cfg@HEAD 1> $UM_OUTDIR/ext.out 2>&1
+
+RC=$?
+if test $RC -eq 0 ; then 
+    echo Base extract:  OK
+else
+    echo Base extract:  failed
+    exit $RC 
+fi
+
+# Set overrides files properly before model or reconf extract
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+export UM_USR_MACH_OVRDS=/home/cmar/srb001/umui_jobs/$RUNID/USR_MACH_OVRDS
+export UM_USR_FILE_OVRDS=/home/cmar/srb001/umui_jobs/$RUNID/USR_FILE_OVRDS
+
+# Model extract: 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+export UM_OUTDIR=$UM_MAINDIR/ummodel
+export UM_ROUTDIR=$UM_RMAINDIR/ummodel
+export UM_JOB_CFG=/home/cmar/srb001/umui_jobs/$RUNID/FCM_UMUI_MODEL_CFG
+fcm extract  -v 3 $UM_SVN_BIND/container.cfg@HEAD 1> $UM_OUTDIR/ext.out 2>&1
+
+RC=$?
+if test $RC -eq 0 ; then 
+    echo Model extract:  OK
+else
+    echo Model extract:  failed
+    exit $RC 
+fi
+
+
+# Reconfiguration extract: 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+export UM_OUTDIR=$UM_MAINDIR/umrecon
+export UM_ROUTDIR=$UM_RMAINDIR/umrecon
+export UM_JOB_CFG=/home/cmar/srb001/umui_jobs/$RUNID/FCM_UMUI_JOB_RECFG
+fcm extract  -v 3 $UM_SVN_BIND/container.cfg@HEAD 1> $UM_OUTDIR/ext.out 2>&1
+
+RC=$?
+if test $RC -eq 0 ; then 
+    echo Reconfiguration extract:  OK
+else
+    echo Reconfiguration extract:  failed
+    exit $RC 
+fi
+

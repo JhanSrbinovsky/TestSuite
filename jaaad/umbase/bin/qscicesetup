@@ -1,0 +1,295 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script:  qscicesetup
+#
+#  Purpose: Set up namelist when running the CICE Sea Ice model,
+#           either as part of a coupled configuration or standalone.
+#           Also manages creation of a resubmit file which is required
+#           when running auto resubmitted CRUNs standalone.
+#
+#  Programming Standard: UMDP 3 version unknown
+#
+#  External documentation:
+#    <UMDP number & name of external documentation> Y1 ?
+#
+#
+#   -------------------------------------------------------------------
+#
+#   Called by: qsexecute (when coupled to UM), qsnemorun (when coupled to NEMO),
+#              qscicerun (standalone)
+#   Calls:     
+#
+#  Imports:
+#
+#    AUTO_RESUB        - Flag to indicate if automatic resubmission needed
+#    CICE              - Flag to indicate if CICE standalone job
+#    CICE_GRID         - Name of CICE grid file (set in UMUI)
+#    CICE_KMT          - Name of CICE kmt file (set in UMUI)
+#    CICE_NL	       - Path of CICE namelist (set in UMUI)
+#    CICE_START	       - Location of CICE input start dump (set in UMUI)
+#    DATAM	       - Directory name in which model executes
+#    NEMO              - Flag to indicate if running with NEMO model
+#    RUNID             - Experiment/job ie abcde
+#    RUN_LEN_DAYS      - Run length (days) specified in UMUI
+#    RUN_LEN_MONTHS    - Run length (months) specified in UMUI
+#    RUN_LEN_YEARS     - Run length (years) specified in UMUI
+#    RESUB_INC_DAYS    - Resubmission interval (days) specified in UMUI
+#    RESUB_INC_MONTHS  - Resubmission interval (months) specified in UMUI
+#    RESUB_INC_YEARS   - Resubmission interval (years) specified in UMUI
+#    TYPE	       - NRUN (normal run) or CRUN (continuation run)
+#
+#  Exports:
+#
+#  Local Variables:
+#
+#    CICE_RESUB_FILE    - Holds details for CICE standalone auto resub
+#    CICE_STEPS	        - Number of CICE timesteps to execute
+#    CICE_STEP_INT      - CICE timestep length (from namelist)
+#    DIAG_STAMP         - Used to calculate timestamp for ice_diag.d file
+#    JOBNAME            - Job name - usually $RUNIDXXX where XXX is run number
+#    JOBNUM             - Used to increment run number for auto CRUNs
+#    RESUB_INC_SEC	- Total resubmission interval calaculated as seconds
+#    RUN_LEFT           - For CRUN, amount left to run from resub file
+#    NEXT_JOBNAME       - Used to set new JOBNAME for auto CRUN
+#    NEXT_JOBNUM        - Used to calculate new run number for auto CRUN
+#    NEXT_RUN_LEFT      - For CRUN, calculated amount left to run
+#    RUN_LEN_SEC	- Total run interval calaculated as seconds
+#    TOTAL_RESUB_DAYS   - Total resubmission interval calaculated as days
+#    TOTAL_RUN_DAYS     - Total run length calaculated as days
+
+
+
+if [ $TYPE = CRUN ]; then
+
+  export CICE_RESUB_FILE=$DATAM/cice_resub
+
+  # Check for ice_diag.d file and rename it to stop overwriting by CRUN
+  
+ 
+  if [ -r $DATAM/ice_diag.d ]; then
+  
+    mv $DATAM/ice_diag.d $DATAM/ice_diag.d_$$
+    
+  fi
+  
+  
+  # If this is a CRUN we need to calculate the CICE timesteps based upon the 
+  # resubmit interval calculated from UMUI info
+  
+  TOTAL_RUN_DAYS=`expr $RUN_LEN_YEARS '*' 360 '+' $RUN_LEN_MONTHS '*' 30 '+' $RUN_LEN_DAYS`
+  
+  if [[ $AUTO_RESUB = "Y" ]]
+  then
+      
+     # Use Resub increments as length for this run 
+
+    TOTAL_DAYS=`expr $RESUB_INC_YEARS '*' 360 '+' $RESUB_INC_MONTHS '*' 30 '+' $RESUB_INC_DAYS`
+	
+  else
+      
+     # Run length for this run is total run length requested
+	  
+    TOTAL_DAYS=$TOTAL_RUN_DAYS
+	  
+  fi
+
+
+
+  RESUB_INC_SEC=`expr $TOTAL_DAYS '*' 86400`
+
+
+  # Edit the CICE name-list
+  
+
+  CICE_STEP_INT=`grep ', dt * =' $DATAM/ice_in|awk -F ' ' {'print $4'}|awk -F '.' \
+                                       {'print $1'}`
+
+  CICE_STEPS=`expr $RESUB_INC_SEC '/' $CICE_STEP_INT`
+    
+
+ed $DATAM/ice_in <<EOF
+/npt/
+c
+  , npt       = $CICE_STEPS
+.
+/runtype/
+c
+  , runtype       = 'continue'
+.
+/restart/
+c
+  , restart       = .true.
+.
+/nprocs/
+c
+    nprocs       = $CICE_NPROC
+.
+w
+q
+EOF
+
+ if [[ "$NEMO" = "false" && "$CICE" = "true" ]]; then
+
+    # If Auto resub has been enabled, check for existing resubmit file
+    # or create one if required
+	
+   if [[ $AUTO_RESUB = "Y" ]]
+   then
+
+     if [ -r $DATAM/cice_resub ]; then
+
+        # Existing resub file, so retrieve details from last run
+
+      RUN_LEFT=`grep 'RUN_LEFT=' $DATAM/cice_resub|awk -F '=' {'print $2'}`
+  
+      NEXT_RUN_LEFT=`expr $RUN_LEFT '-' $TOTAL_DAYS`
+      
+      
+  
+       if [ $NEXT_RUN_LEFT -gt 0 ]; then
+  
+         # More left to run so edit new details into resub file
+
+      JOBNAME=`grep 'JOBNAME=' $DATAM/cice_resub|awk -F '=' {'print $2'}`
+      JOBNUM=`expr 'substr' $JOBNAME 6 3`
+      export NEXT_JOBNUM=`expr $JOBNUM '+' 1`
+
+      length=`echo $NEXT_JOBNUM | wc -c | cut -c1-8`
+      length=`expr $length '-' 1`
+
+      if [[ $length = 1 ]]; then
+
+       NEXT_JOBNAME=${RUNID}00${NEXT_JOBNUM}
+ 
+      elif [[ $length = 2 ]]; then
+
+       NEXT_JOBNAME=${RUNID}0${NEXT_JOBNUM}
+ 
+      else
+
+       NEXT_JOBNAME=${RUNID}${NEXT_JOBNUM}
+ 
+      fi
+    
+ed $DATAM/cice_resub <<EOF
+/FLAG/
+c
+FLAG='Y'
+.
+/RUN_LEFT/
+c
+RUN_LEFT=$NEXT_RUN_LEFT
+.
+/JOBNAME/
+c
+JOBNAME=$NEXT_JOBNAME
+.
+w
+q
+EOF
+  
+       else
+  
+            # Finished total run, delete resub file
+    
+         rm -rf $DATAM/cice_resub
+
+       fi
+       
+  
+     else
+
+          # Check if a resubmit is needed or just straight CRUN
+  
+       NEXT_RUN_LEFT=`expr $TOTAL_RUN_DAYS '-' $TOTAL_DAYS`
+  
+ 
+        if [ $NEXT_RUN_LEFT -gt 0 ]; then
+  
+             # Create CICE resubmit file for automatic resubmission of CRUNs
+	   
+  
+cat > $DATAM/cice_resub <<EOF
+FLAG='Y'
+RUN_LEFT=$NEXT_RUN_LEFT
+JOBNAME=${RUNID}001
+EOF
+
+        fi
+  
+     fi # Check for existing resub file when Auto Resubmitting 
+   
+   fi # Check for Auto Resubmission
+
+ fi    # Not using NEMO
+ 
+
+else  # Not a CRUN
+
+  
+  # This is an NRUN so copy namelist in
+
+  cp $CICE_NL $DATAM/ice_in
+  
+  # If this is an NRUN we need to calculate the CICE timesteps based upon the 
+  # run length calculated from UMUI info
+
+  
+  TOTAL_RUN_DAYS=`expr $RUN_LEN_YEARS '*' 360 '+' $RUN_LEN_MONTHS '*' 30 '+' $RUN_LEN_DAYS`
+
+  RUN_LEN_SEC=`expr $TOTAL_RUN_DAYS '*' 86400`
+
+  CICE_STEP_INT=`grep ', dt * =' $DATAM/ice_in|awk -F ' ' {'print $4'}|awk -F '.' \
+                                       {'print $1'}`
+
+  CICE_STEPS=`expr $RUN_LEN_SEC '/' $CICE_STEP_INT`
+  
+
+  # Edit the CICE name-list
+   
+ed $DATAM/ice_in <<EOF
+/npt/
+c
+  , npt       = $CICE_STEPS
+.
+/history_file/
+c
+  , history_file = '${RUNID}i.1m'
+.
+/restart_file/
+c
+  , restart_file = '${RUNID}i.restart'
+.
+/ice_ic/
+c
+  , ice_ic = '$CICE_START'
+.
+/incond_file/
+c
+  , incond_file = '${RUNID}i_ic'
+.
+/grid_file/
+c
+  , grid_file = '${CICE_GRID}'
+.
+/kmt_file/
+c
+  , kmt_file = '${CICE_KMT}'
+.
+/nprocs/
+c
+    nprocs       = $CICE_NPROC
+.
+w
+q
+EOF
+
+fi # Check for CRUN/NRUN
+
+#L--------------------------------------------
+

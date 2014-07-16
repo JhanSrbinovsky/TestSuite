@@ -1,0 +1,251 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (c) CROWN COPYRIGHT 2000, Met Office, All Rights Reserved.
+# Please refer to file $UMDIR/vn$VN/copyright.txt for further details
+# *****************************COPYRIGHT******************************
+#
+#  Script: Frames
+#
+#  Purpose: utility to make a boundary dataset from model dumps
+#
+#  Current Owner: Tom Green
+#
+#  Tested under OS version: UNICOS unknown
+#  UM   version no: ?  Date of test: unknown
+#
+#
+#  Programming standard: UMDP 3, version <UMDP 3 version number>
+#
+#  External documentation:
+#    <UMDP number & name of external documentation>
+#
+#   Interface and arguments:
+#
+#   frames -n namelist -i dump1 [[dump2][dump3]...]
+#          -o[w] output_frames_dataset 
+#
+#   3 or more arguments as follows:
+#
+#        -n             Specifies next argument is the namelist
+#        namelist       Pathname of file containing namelist
+#                       specifing details of ancilliary file
+#
+#        -i             Specifies that next argument(s) are the input
+#                       dumps or fieldsfiles
+#        dump1          Pathname(s) of input dump(s) or fields file(s)
+#        [[dump2]..]    used in the creation of boundary dataset
+#
+#        -o[w]          Specifies the next arguments as output lbc files
+#                       (w switch enables automatic overwrite if files
+#                       already exist)
+#         output_frames_dataset
+#
+#   -------------------------------------------------------------------
+#   Called by: user
+#   Calls    : frames
+#
+#   Imports:
+#     TMPDIR         - Directory in which output redirected to.
+#     VN             - Version number of the program library to be used.
+#
+#   Exports:
+#     bc_namelist
+#     BCFIL${bc_filenum}
+#     FILE${filenum}
+#     UM_SECTOR_SIZE - UM sector size
+#     UNIT22         - Stashmaster file
+#
+#   Local variables:
+#     EXEC           - Directory containing executable
+#     FILE??         - Input dump filenames
+#     filenum
+#     bc_filenum
+#
+#     namelist_read  - Logicals which are used to decide what
+#     input_file       each argument is being read in for
+#     output_file
+
+# End of header -------------------------------------------------------
+
+set -x
+
+
+#Set default Print Status
+export PRINT_STATUS=${PRINT_STATUS:-PrStatus_Normal}
+# Step 0 - Set up environment variables
+#
+
+# Automatically set in this script at each UM build
+VN=@vn@
+TARGET_MC=@target_mc@
+
+# Directory for intermediate files
+TMPDIR=$SCRATCH
+
+# Directory containing executable
+EXEC=${EXEC:-$UMDIR/vn$VN/$TARGET_MC/exec}
+
+# UM Sector Size
+UM_SECTOR_SIZE=${UM_SECTOR_SIZE:-2048}
+export UM_SECTOR_SIZE
+
+export UNIT22=$UMDIR/vn$VN/ctldata/STASHmaster
+
+#Set up the initial values for filenum and bc_filenum
+# so that correct environment variables are generated
+filenum=30
+bc_filenum=0
+
+#Default values of logicals
+namelist_read=false
+input_file=false
+output_file=false
+bc_overwrite=false
+
+#Check for the minimum number of input arguments
+# generate error message if not
+if [ $# -lt 6 ]
+  then
+  echo "Usage: frames -n namelist -i dump1 [[dump2][dump3]...] \
+-o output_frames_dataset"
+
+    exit 1
+fi
+
+while [ $# -gt 0 ]
+do
+
+#Set logicals according to file type arguments
+    case $1 in
+      -n)
+#         echo $1
+         echo "set up the namelist"
+         namelist_read=true
+         input_file=false
+         output_file=false
+         shift
+         ;;
+
+      -i)
+#         echo $1
+         echo "set up the input files"
+         namelist_read=false
+         input_file=true
+         output_file=false
+         shift
+         ;;
+
+      -o)
+#         echo $1
+         echo "set up the output files"
+         namelist_read=false
+         input_file=false
+         output_file=true
+         bc_overwrite=false
+         shift
+         ;;
+
+      -ow)
+#         echo $1
+         echo "set up the output files (automatic overwrite enabled)"
+         namelist_read=false
+         input_file=false
+         output_file=true
+         bc_overwrite=true
+         shift
+         ;;
+
+    esac
+
+# Do this if it's a namelist argument
+    if [ $namelist_read = true ]
+       then
+       if [ ! -f $1 ]
+          then
+          echo "WARNING: file $1 does not exist"
+          exit 1
+       else
+          export bc_namelist=$1
+          shift
+       fi
+
+
+#And this if it's an input file
+    elif [ $input_file = true ]
+       then
+       filenum=`expr $filenum + 1`
+       if [ ! -f $1 ]
+          then
+          echo "WARNING: Input file $1 does not exist"
+          exit 1
+       else
+          export "FILE${filenum}"=$1
+          shift
+       fi
+
+
+#And finally if it's one of the output files
+    elif [ $output_file = true ]
+       then
+       bc_filenum=`expr $bc_filenum + 1`
+
+# Check if the lbc file already exists, if not export filename as
+# variable BCFILxx where xx is the sequential number
+# of LAM (one file per LAM)
+       if [ ! -f $1 ]
+          then
+          export "BCFIL${bc_filenum}"=$1
+          shift
+       else
+
+
+# If the lbc file already exists, overwrite if the overwrite flag is set
+# if not ask for user input
+          if [ $bc_overwrite = true ]
+             then
+             export "BCFIL${bc_filenum}"=$1
+             shift
+          else
+             echo "WARNING: Output file $1 already exists"
+             echo "Do you want to overwrite this file (y/n)?"
+             read option
+             case "$option" in
+                y)
+                  export "BCFIL${bc_filenum}"=$1
+                  shift
+                  ;;
+                n)
+                  exit 0
+                  ;;
+                *)
+                  echo "Invalid answer"
+                  exit 1
+                  ;;
+              esac
+          fi
+       fi
+    fi
+done
+
+# Export the name of the namelist to UNIT05
+export UNIT05=$bc_namelist
+
+# Export output frames dataset
+export UNIT20=$BCFIL1
+
+#
+#Run the executable (serial version)
+#
+$EXEC/frames.exe < $bc_namelist 1> $TMPDIR/frames_out.$$ 2>&1
+
+
+CC=$?
+if [ $CC != 0 ]
+then
+echo 'Problem with FRAMES program'
+fi
+
+cat $TMPDIR/frames_out.$$
+echo 'FRAMES output in:' $TMPDIR/frames_out.$$
+
+exit $CC

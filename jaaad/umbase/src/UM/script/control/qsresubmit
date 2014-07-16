@@ -1,0 +1,264 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script: qsresubmit
+#
+#  Purpose: Creates resubmit jobscript
+#
+#  Current Owner: W Roseblade    Date: 1/02/06
+#  Reviewer: M Saunby            Date: 1/02/06
+#
+#  Tested under OS version: UNICOS unknown
+#  UM   version no: unknown      Date of test: unknown
+#
+#  Programming standard: UM Doc Paper 3A, version 1 (29/10/90)
+#
+#  External documentation:
+#    UMDP
+#
+#   Interface and arguments: qsresubmit jobscript resub file
+#
+# Arguments: $1 - jobscript pathname
+#            $2 - temporary file containing resubmit details
+#
+#   -------------------------------------------------------------------
+#
+# Called by: UM final script
+# Calls    : None
+#
+#  Imports  :
+#  ALTIX            - Flag to indicate running on Altix machine
+#  AUTOMATIC_PP     - "true" if post processing
+#  CCMAIN           - Error code from main calling script
+#  DATAW            - User-specific read/write data files
+#  ERRFLAG          - Location of error flag file for server
+#  FLAG             - Flag to determine whether to resubmit or not.
+#  HOME             - Users home directory
+#  IBM              - Flag indicating running on IBM machine
+#  JOBNAME          - Experiment jobname ie abcde005
+#  LOADL_STEP_NAME  - IBM Loadleveler variable indicating current jobstep
+#  MY_OUTPUT        - Directory for user output ie /u/output/t20xx
+#  NECSX6           - Flag indicating running on NEC at Met Office
+#  OUT_CLASSR       - Output class for resubmitted jobs
+#  RCSERVER         - Error return code in $ERRFLAG
+#  RESUB_FILE       - Name of file holding resubmit command
+#  RUNID            - Job 5-character expt+runid
+#  SGI              - Flag to indicate running on SGI machine
+#  SETOPT           - Shell options
+#  SUBMITID         - Job directory of the format abcde-342110102
+#  TMPDIR           - Temporary directory
+#  TYPE             - Run type new or continuation
+#  UM_ATMOS         - Indicates UM run 
+#  UM_DOJOBSTEP     - Only relevant if using job steps on IBM (Reading)
+#  UM_LLJOBSTEPS    - Only relevant if using job steps on IBM (Reading)
+#  UM_SED           - Location of sed command
+#
+#  Exports:
+#  JOBDIR           - $HOME/umui_runs/$RUNID-$SUBMITID
+#  OPRESTART        - Restart code 
+#  SUBMITID         - Job directory of the format abcde-342110102
+#
+#  Local variables:
+#  CC               - Return code from command
+#  FINAL_STEP       - Used to indicate final job step if using on IBM
+#  OUTFILE          - Output file name
+#                     i.e. acanb004.acanb.d00020.t015439.leave
+#  OUTPUT_SUBID     - Date code part of OUTFILE
+#  SUBMIT_CMD       - Command for job submission e.g., qsub.
+#  SUBMIT_OPTS      - Options for job submission.
+#  TIME             - Timestamp in format hours/mins/secs
+#  TITLE            - $DATAW/TITLE infofile for fortran print out.
+#  YEAR_DAY         - Day of the year ie 00021 for 21st jan
+#
+# End of header -------------------------------------------------------
+#
+########################################################################
+# Step 0 - Set up environment variables
+#
+set -$SETOPT
+########################################################################
+# Step 1 - Extract resubmit details from file RSUB.
+#          The deck WRITRSU1.dk reads the namelists from
+#          INITHIS and sets FLAG to Y/N.
+#
+if test -f $2
+then
+  mv $2 $2.tmp
+# Get rid of spaces so unix can read file ok.
+  $UM_SED 's/ *= */=/' $2.tmp > $2
+  chmod 755 $2
+  . $2               # Execute to set environment variables
+  if test $FLAG != 'Y'
+  then
+    echo "$0: No resubmit requested"
+    exit 0
+  fi
+
+
+  if $AUTOMATIC_PP
+  then      # check server return code before resubmission
+    RCSERVER=`cat $ERRFLAG|cut -c 1`
+    if test $RCSERVER = "T"
+    then
+     echo "$0: Error job not resubmitted because of server failure"
+     exit 135
+    fi
+  fi
+else
+
+  # Missing resubmit file is only a problem for UM runs
+  if [ "$UM_ATMOS" = "true" ]; then
+  
+    echo "$0: Error: no resubmit details found"
+    exit 135                                   # Abort
+  else
+    echo "$0: No resubmit required"
+    exit 0
+  fi                                   
+fi
+#
+#
+if test $CCMAIN -ne 0
+then
+   echo "$0: Error job not resubmitted because of error in $MAIN_SCR"
+   exit 135
+fi
+#
+if test $TYPE = 'NRUN'
+then
+   echo "$0: Error job not resubmitted because job script is for a new \
+   run"
+   exit
+fi
+#
+########################################################################
+# Step 2 - Resubmit jobscript if step 1 OK and resubmit requested
+#
+SCRIPT=$1
+
+
+# Write resubmit command to a separate file to be submitted later
+# after job output has been returned to front-end to prevent output
+# from first job getting mixed up with output from second job if job
+# gets resubmitted immediately.
+
+
+if test -z "$RESUB_FILE"
+then
+   RESUB_FILE=$TMPDIR/$RUNID.resub
+fi
+
+if test -f "$RESUB_FILE"
+then
+   rm $RESUB_FILE
+fi
+
+# Save current SUBMITID and JOBDIR
+
+SUBMITID=$SUBMITID
+export SUBMITID                  # just in case someone uses it
+JOBDIR=$HOME/umui_runs/$RUNID-$SUBMITID
+export JOBDIR
+
+# Set up variables for date/time stamping new output file name
+YEAR_DAY=`date +%y%j`
+TIME=`date +%H%M%S`
+OUTPUT_SUBID=d$YEAR_DAY.t$TIME
+
+# Set up the new output file name
+
+if [[ $IBM = true ]]
+then
+ # Need to create the new job name and edit it into umuisubmit_run for resubmission
+ # by loadleveler
+ export OUTFILE=$MY_OUTPUT/$JOBNAME.$RUNID.$OUTPUT_SUBID.$OUT_CLASSR
+ eval "$UM_SED 's:#@ output .* = .*:#@ output = $OUTFILE:' \
+           $JOBDIR/umuisubmit_run > $TMPDIR/umuisubmit_run.tmp"
+ eval "$UM_SED 's:#@ error .* = .*:#@ error = $OUTFILE:' \
+           $TMPDIR/umuisubmit_run.tmp > $TMPDIR/umuisubmit_run.$$"
+ rm -rf $TMPDIR/umuisubmit_run.tmp 1>/dev/null 2>&1
+	   
+else
+
+  # Non IBM - set new job output file - this can be passed straight through to qsub using -o option
+  export OUTFILE=$MY_OUTPUT/$JOBNAME.$RUNID.$OUTPUT_SUBID.$OUT_CLASSR
+  TITLE=$DATAW/TITLE
+cat > $TITLE <<EOF
+  &TITLF TITLE1="$JOBNAME" /
+EOF
+  cp $JOBDIR/umuisubmit_run $TMPDIR/umuisubmit_run.$$
+fi 
+
+# The following IBM if block checks if job steps are being used in Loadleveler on IBM.
+# and sets name of final job step. If job steps are not being used
+# then FINAL_STEP is just set to $LOADL_STEP_NAME which is 0 by default
+
+if [[ $IBM = true ]]
+then
+  SUBMIT_CMD="llsubmit $TMPDIR/umuisubmit_run.$$"
+  if [[ -n "$UM_DOJOBSTEP" ]]
+  then
+    FINAL_STEP="step_"$UM_LLJOBSTEPS
+    touch $UM_DOJOBSTEP
+  else
+    FINAL_STEP=$LOADL_STEP_NAME
+  fi
+elif [[ $SGI = true || $ALTIX = true ]]
+then
+  SUBMIT_CMD="bsub -J $JOBNAME -o $OUTFILE < $TMPDIR/umuisubmit_run.$$"
+elif [[ $NECSX6 = true ]]
+then
+# Met Office NEC
+  SUBMIT_OPTS="-N $JOBNAME -o $OUTFILE -S"
+  SUBMIT_CMD="qsub $SUBMIT_OPTS /bin/ksh $TMPDIR/umuisubmit_run.$$"
+else
+#Default NQS options
+  SUBMIT_OPTS="-x -r $JOBNAME -o $OUTFILE -s"
+  SUBMIT_CMD="qsub $SUBMIT_OPTS /bin/ksh $TMPDIR/umuisubmit_run.$$"
+fi
+
+# The IBM if block created in $RESUB_FILE checks whether the current Loadleveler step name
+# equals the final step as determined earlier. Both string '=' and numeric '-eq' equality
+# checks are needed as if jobs steps are being used $LOADL_STEP_NAME contains a string
+# such as 'step_1'. If job steps are not being used the $LOADL_STEP_NAME is set to 0. 
+
+cat > $RESUB_FILE << eof
+  export OPRESTART=3  # indicates run has been automatically resubmitted
+  if [[ \$IBM = true ]]
+  then
+    if [[ \$LOADL_STEP_NAME = \$FINAL_STEP || \$LOADL_STEP_NAME -eq \$FINAL_STEP ]]
+    then
+      echo "Job resubmitting itself..."
+      $SUBMIT_CMD
+      CC=\$?
+    else
+      echo "Job will continue with next job step"
+      CC=0
+    fi
+  else
+    $SUBMIT_CMD
+    CC=\$?
+  fi
+
+  if test \$CC -eq 0
+  then
+    echo "qsresubmit: submitted job successfully"
+  elif test \$CC -eq 1
+  then
+    echo "qsresubmit: job not resubmitted due to user error:"
+    echo $SUBMIT_CMD
+  elif test \$CC -eq 2
+  then
+    echo "qsresubmit: job not resubmitted due to NQS error"
+  fi
+eof
+
+
+chmod 755 $RESUB_FILE
+
+
+########################################################################

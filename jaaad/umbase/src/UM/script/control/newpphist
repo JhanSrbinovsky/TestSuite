@@ -1,0 +1,108 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script: newpphist
+#
+#  Purpose: To initialize variables stored in the post processing
+#           history file
+#
+#  Current Owner: W Roseblade    Date: 1/02/06
+#  Reviewer: M Saunby            Date: 1/02/06
+#
+#  Tested under OS version: unknown
+#  UM version no: 3.4                 Date of test:
+#
+#  History:
+#   Model
+#  version  Date         Modification history:
+#    3.4    20/12/94     Original Version C D Perks
+#    4.0    14/08/95     Remove unnecessary initialisations K Rogers
+#    4.1    26/03/96     Remove trigger file request limits L Wiles
+#                        from history file so they can be changed
+#                        more easily.  They're in PPCNTL anyway.
+#    4.1    09/04/96     Remove *IF DEF METOCRAY and *ENDIF K Rogers
+#    5.1    19/07/00     Variable Classification. W Roseblade
+#    5.2    15/09/00     New Header Format W Roseblade
+#  6.2      25/08/06     Remove space between #! /bin/ksh W Roseblade.
+#
+#  Programming Standard: UMDP 3 version unknown
+#
+#  External documentation:
+#    <UMDP number & name of external documentation>
+#
+#  Interface and arguments: none
+#
+#
+#----------------------------------------------------------------
+#  Called by: qsserver
+#
+#  Calls: none
+#
+#  Imports:
+#    PPHIST              - newpphist file
+#    DMP_FILECOUNT       - Number of entries in dump TF
+#    MPP_FILECOUNT       - Number of entries in mean pp TF
+#    MPP_FILECOUNT       - Number of entries in mean pp TF
+#    PP_FILECOUNT        - Number of entries in pp TF
+#    BF_FILECOUNT        - Number of entries in boundary data TF
+#    MIX_FILECOUNT       - Number of entries in mixed TF
+#    DB_FILECOUNT        - Number of entries in dump/bndy TF
+#    PMP_FILECOUNT       - Number of entries in pp and mean pp data TF
+#    DMP_F_END_TF        - Current dump trigger file
+#    MPP_F_END_TF        - Current mean pp trigger file
+#    PP_F_END_TF         - Current pp trigger file
+#    BF_F_END_TF         - Current boundary data trigger file
+#    MIX_F_END_TF        - Current mixed trigger file
+#    DB_F_END_TF         - Current dump/bndy trigger file
+#    PMP_F_END_TF        - Current pp and mean pp trigger file
+#    DMP_LAST_FILE       - Last dump file archived
+#    MPP_LAST_FILE       - Last mean pp file archived
+#    MPP_LAST_FILE       - Last mean pp file archived
+#    PP_LAST_FILE        - Last pp file archived
+#    BF_LAST_FILE        - Last boundary data file archived
+#    MIX_LAST_FILE       - Last mixed file archived
+#    DB_LAST_FILE        - Last dump/bndy file archived
+#    PMP_LAST_FILE       - Last pp and mean pp  file archived
+#    DMP_LAST_TF         - Last dump trigger file for current run
+#    MPP_LAST_TF         - Last mean pp trigger file for current run
+#    MPP_LAST_TF         - Last mean pp trigger file for current run
+#    PP_LAST_TF          - Last pp trigger file for current run
+#    BF_LAST_TF          - Last boundary trigger file for current run
+#    MIX_LAST_TF         - Last mixed trigger file for current run
+#    DB_LAST_TF          - Last dump/bndy trigger file for current run
+#    PMP_LAST_TF         - Last pp and mean pp trigger file, current run
+#
+#  Local: none
+#  Exports: none
+#
+# End of header -------------------------------------------------------
+echo "Updating newpphist file..."
+
+cat > $PPHIST << eof
+DMP_FILECOUNT=${DMP_FILECOUNT:-0}
+MPP_FILECOUNT=${MPP_FILECOUNT:-0}
+PP_FILECOUNT=${PP_FILECOUNT:-0}
+BF_FILECOUNT=${BF_FILECOUNT:-0}
+MIX_FILECOUNT=${MIX_FILECOUNT:-0}
+DB_FILECOUNT=${DB_FILECOUNT:-0}
+PMP_FILECOUNT=${PMP_FILECOUNT:-0}
+F_END_TF=${F_END_TF:-0}
+DMP_LAST_FILE=${DMP_LAST_FILE:-none}
+MPP_LAST_FILE=${MPP_LAST_FILE:-none}
+PP_LAST_FILE=${PP_LAST_FILE:-none}
+BF_LAST_FILE=${BF_LAST_FILE:-none}
+MIX_LAST_FILE=${MIX_LAST_FILE:-none}
+DB_LAST_FILE=${DB_LAST_FILE:-none}
+PMP_LAST_FILE=${PMP_LAST_FILE:-none}
+DMP_LAST_TF=${DMP_LAST_TF:-false}
+MPP_LAST_TF=${MPP_LAST_TF:-false}
+PP_LAST_TF=${PP_LAST_TF:-false}
+BF_LAST_TF=${BF_LAST_TF:-false}
+MIX_LAST_TF=${MIX_LAST_TF:-false}
+DB_LAST_TF=${DB_LAST_TF:-false}
+PMP_LAST_TF=${PMP_LAST_TF:-false}
+eof

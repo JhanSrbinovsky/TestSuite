@@ -1,0 +1,305 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script:  startrun
+#
+#  Purpose: Called by a user in order to re-start a run which has
+#           been stopped by STOPRUN.
+#
+#  Current Owner: W Roseblade    Date: 1/02/06
+#  Reviewer: M Saunby            Date: 1/02/06
+#
+#  Tested under OS version: UNICOS 7.C
+#  UM  version no: 4.0      Date of test: 16 Oct 1995
+#
+#  History:
+#   Model
+#  version  Date         Modification history:
+#    4.0    09/10/95     Original version.
+#    4.3    25/04/97     Converted to use new submit script.
+#                        S Mullerworth
+#    4.3    25/04/97     Added OPRESTART variable. K Rogers
+#    5.2    20/09/00     New Header Format W Roseblade
+#    6.0    26/11/03     Change for the NECSX6. A. A. Dickinson
+#    6.2    17/02/06     Removal of METOCRAY,CRAYPVP logic,code.
+#                        W Roseblade
+#  6.2      25/08/06     Remove space between #! /bin/ksh W Roseblade.
+#
+#  Programming standard: UM Doc Paper 3A, version 1 (29/10/90)
+#
+#  External documentation:
+#    UM Doc Paper C0 - The top-level control system
+#
+#   Interface and arguments: startrun
+#                            [-q queuename]
+#                            [-r jobname]
+#                            [-o opstartdir]
+#                            startfile
+#
+#   queuename      - Name of queue if passed in using -q option.
+#                    Optional
+#   jobname        - Jobname of restarted run -r option. Optional
+#   startfile      - File written by stoprun holding RUNID, SUBMITID
+#                    USRHOME, JOBNAME and RUN TYPE
+#   opstartdir     - Option used by operator script for the path to the
+#                    directory holding the STARTFILES.
+#                    -o Mandatory if called by operator script
+#   -------------------------------------------------------------------
+#
+#   Called by:      [opstartrun]
+#   Calls    : none
+#
+#   Imports:
+#     HOME         - User's home directory. Used to set up INFOPATH for
+#                    runs started by the user, not the operator.
+#     JOB_OUTPUT   - Central directory for output
+#     OPTIND       - Shell options
+#     OPTARG       - Shell options
+#     OPTION       - Shell options
+#
+#   Exports:
+#     JOBDIR       - complete path of directory holding top level
+#                    script
+#     OPRESTART    - Operator restart flag.
+#     SUBMITID     - Dir containing job files under $HOME/umui_runs
+#
+#   Local variables:
+#   INFOPATH        - PATH for STARTFILE
+#   JOB             - Jobname of restarted run -r option. Optional
+#   JOBDIR          - complete path of directory holding top level
+#                     script
+#   JOBNAME         - JOBNAME from the STARTFILE
+#   OPSTARTDIR      - Option used by operator script for the path to the
+#                     directory holding the STARTFILES.
+#                     -o Mandatory if called by operator script
+#   OUTFILE         - Full path file name for output file, including
+#                     extension
+#   OUT_CLASS       - Extension to determine output handling
+#   OUTPUT_SUBID    - Date stamp used as new submitid for this run
+#   OUTPUTDIR       - Directory holding output
+#   QUEUENAME       - Name of queue if passed in using -q option.
+#                     Optional
+#   RUN_TYPE        - variable to distinguish NRUNs. Held in STARTFILE
+#   RUNID           - Run id (expt id + job id)
+#   STARTFILE       - File written by stoprun holding RUNID, SUBMITID
+#                     USRHOME, JOBNAME and RUN TYPE
+#   SUBMITID        - Dir containing job files under $HOME/umui_runs
+#   TIME            - Timestamp of the format hours/mins/secs
+#   UMUSER          - User ID needed for correct output directory
+#   USRHOME         - HOME directory of the owner of the job
+#   YEAR_DAY        - Day of the year ie 00021 for 21st jan
+#   errmker         - Flag to test for invalid options
+#   no_of_args      - Number of arguments passed to script
+#   qsubfile        - set to QSUB by default. Changed to QSUBR if it
+#                     is a re-submitting run, and is not an NRUN
+#   var1            - temporary first 5 characters of jobname
+#   var2            - temporary incremented part of jobname
+#   var3            - temporary value '0' needed to pad out numbers less
+#                     than 10
+#
+#   End of header -----------------------------------------------------
+#
+#L----------------------------------------------------------------
+#L  Step 0 - Initialise variables
+#L----------------------------------------------------------------
+
+QUEUENAME='unset'
+JOB='unset'
+OPSTARTDIR='unset'
+qsubfile='QSUB'
+
+#L----------------------------------------------------------------
+#L  Step 1 - Check arguments are given
+#L----------------------------------------------------------------
+
+# Check there are enough arguments.
+
+no_of_args=$#
+if test $no_of_args -lt 1
+then
+  echo Choose correct file in $HOME/umui_runs/startinfo
+  exit
+fi
+
+
+# Check there are not too many arguments
+
+if test $no_of_args -gt 7
+then
+  echo Too many arguments have been passed.
+  exit
+fi
+
+#L-----------------------------------------------------------------
+#L  Step 2 - Check and process options
+#L-----------------------------------------------------------------
+
+errmker=0
+while getopts q:r:o: OPTION
+do
+   case $OPTION in
+      q) QUEUENAME=$OPTARG      #optional change to queue
+         ;;
+      r) JOB=$OPTARG            #optional change to jobname
+         ;;
+      o) OPSTARTDIR=$OPTARG     #start directory used by operators
+         # OPRESTART variable already set to 1 or 2 in this case
+         ;;
+      *) echo This option is invalid
+         errmker=1
+         break;;
+   esac
+done
+shift `expr $OPTIND - 1`
+
+if test $errmker -ne 0
+then
+  echo Invalid opion used.
+  exit 1
+fi
+
+if test $# -lt 1
+then echo Unable to process. Missing STARTINFO file name
+exit
+fi
+
+export OPRESTART=${OPRESTART:-0}
+
+#L------------------------------------------------------------------
+#L Step 3
+#L Assign runid, submitid, usrhome, job, run type. Usrhome needed for
+#L output to be in correct directory.
+#L------------------------------------------------------------------
+
+STARTFILE=$1
+
+if test $OPSTARTDIR = 'unset'
+then
+   INFOPATH=$HOME/umui_runs/startinfo
+else
+   INFOPATH=$OPSTARTDIR
+fi
+
+. $INFOPATH/$STARTFILE
+
+JOBDIR=$USRHOME/umui_runs/$RUNID-$SUBMITID
+OUTPUTDIR=$JOB_OUTPUT/$UMUSER
+
+#test needed here for existence of JOBDIR
+if test -d $JOBDIR
+then
+   echo Starting run from $STARTFILE
+else
+  echo $JOBDIR does not exist. Please check correct startfile was used.
+  exit
+fi
+
+# Prevent re-starting of NRUNS
+# Send message to user on how to edit files to re-start
+
+if test $RUN_TYPE = 'NRUN'
+then
+if test  $OPSTARTDIR = 'unset'
+  then
+   echo --------------------------------------------------------------
+   echo
+   echo This is an NRUN. To re-start, edit \
+        umui_runs/$RUNID-$SUBMITID/SCRIPT
+   echo and umui_runs/startinfo/$RUNID-$SUBMITID to change NRUN to CRUN.
+   echo Also change STEP=1 to STEP=4 in SCRIPT. Then try again.
+   echo
+   echo --------------------------------------------------------------
+ else
+ echo $RUNID is an NRUN. It has not been re-started
+ fi
+exit
+fi
+
+
+if test $JOB = 'unset'
+then
+   JOB=$JOBNAME
+fi
+
+#L----------------------------------------------------------------
+#L  Step 4
+#L  Check for resubmitting runs
+#L calculate next jobname for re-submitting runs
+#L---------------------------------------------------------------
+
+if test -f $JOBDIR/QSUBR -a $RUN_TYPE != 'NRUN'
+then
+   qsubfile='QSUBR'
+fi
+
+if test $qsubfile = 'QSUBR'
+then
+ # calculate new number if The JOBNAME is from the startfile
+   if test $JOBNAME = $JOB
+   then
+     var1=`echo $JOB|cut -c 1-6`
+     var2=`echo $JOB|cut -c 7-8`
+     var2=`expr $var2 + 1`
+     if test `expr $var2` -ge 100
+     then
+        var2=`expr $var2 - 100`
+     fi
+     if test `expr $var2` -lt 10
+        then
+          var3='0'
+        else
+          var3=''
+     fi
+     JOB=$var1$var3$var2
+   fi
+fi
+
+
+#L----------------------------------------------------------------
+#L Step 5
+#L construct script for run restart submission:
+#L----------------------------------------------------------------
+
+# new submit
+  SUBMITID=$SUBMITID
+  JOBDIR=$USRHOME/umui_runs/$RUNID-$SUBMITID
+  export SUBMITID JOBDIR
+
+  cp $JOBDIR/umuisubmit_run $TMPDIR/restart.$$
+
+#L----------------------------------------------------------------
+#L Step 6
+#L submit run
+#L----------------------------------------------------------------
+YEAR_DAY=`date +%y%j`
+TIME=`date +%H%M%S`
+OUTPUT_SUBID=d$YEAR_DAY.t$TIME
+OUTFILE=$OUTPUTDIR/$JOB.$RUNID.$OUTPUT_SUBID.$OUT_CLASS
+
+NQS_option="-N $JOB -o $OUTFILE -S"
+
+if test $QUEUENAME = 'unset'
+then
+   qsub $NQS_option /bin/ksh  $TMPDIR/restart.$$
+else
+   qsub -q $QUEUENAME $NQS_option /bin/ksh  \
+   $TMPDIR/restart.$$
+fi
+
+CC=$?     # test for successful submission
+
+
+if test $CC -eq 0
+then
+ echo STARTRUN: $JOB successfully submitted using $RUNID-$SUBMITID \
+ on `date`
+    rm $TMPDIR/restart.$$
+    rm -r $INFOPATH/$RUNID-$SUBMITID
+else
+ echo STARTRUN: $JOB failed to re-start from $RUNID-$SUBMITID on
+ echo `date`
+fi

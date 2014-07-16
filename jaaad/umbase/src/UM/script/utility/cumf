@@ -1,0 +1,179 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script: cumf
+#
+#  Purpose: Compares two atmosphere, ocean or ancillary files.
+#
+#  Current Owner: W Roseblade    Date: 1/02/06
+#  Reviewer: M Saunby            Date: 1/02/06
+#
+#
+#  Programming standard: UMDP 3 version unknown
+#
+#  External documentation:
+#    <UMDP number & name of external documentation>
+#
+# Interface and Arguments:
+#
+#   cumf [-uSTASH USTSNUM][-dOUT CUMFDIR] [-32] file1 file2
+#
+#   $1 (optional) -uSTASH <USTSNUM> : User STASHmaster file name
+#   $2 (optional) -dOUT <CUMFDIR>   : User specified output dir
+#   $3 (optional) -32               : Run with 32-bit version
+#   $4                              : File1
+#   $5                              : File2
+#
+#   -------------------------------------------------------------------
+#
+#   Called by: user
+#   Calls    : none
+#
+#   Imports  :
+#      PRINT_STATUS
+#      TMPDIR
+#      CUMFDIR
+#      UMDIR
+#
+#   Exports  :
+#      UNIT07
+#      UNIT08
+#      UNIT10
+#      UNIT20
+#      UNIT21
+#      UNIT22
+#
+#   Local variables:
+#      counter
+#      EXEC - Directory containing executable
+#      FILE1
+#      FILE2
+#      STASHMSTR
+#      USTASH
+#      USTSNUM
+#      BUILD32
+#      VN
+#      PLATFORM
+#
+#   End of header -----------------------------------------------------
+#
+# Step 00 - Check call syntax
+#
+set -a
+
+cmessage="$0: Usage is $0 -uSTASH ustsnum -dOUT [-32] file1 file2"
+if [ $# -lt 2 -o $# -gt 7 ]
+  then echo $cmessage; exit 1
+fi
+
+########################################################################
+# Step 0 - Initialise local variables
+#
+
+counter=0
+USTASH=n
+BUILD32=n
+
+########################################################################
+# Step 1 - Interpret arguments
+#
+
+cline=$*
+
+# parse command line options
+for arg in $cline
+do
+  case $arg in
+       '-uSTASH') USTASH=y ; USTSNUM=$2 ; shift 2 ;;
+         '-dOUT') CUMFDIR=$2 ; shift 2 ;;
+           '-32') BUILD32=y ; shift 1 ;;
+              -*) echo "Error: bad arg \"$1\""
+                  echo $cmessage
+                  exit 1 ;;
+  esac
+done
+
+
+if [ $# -ne 2 ]; then
+  echo $cmessage; exit 1
+fi
+
+if test "$1" = "-dOUT" || test "$1" = "-uSTASH"; then
+  echo $cmessage; exit 1
+fi
+
+FILE1=$1
+FILE2=$2
+
+if test ! -f "$FILE1"; then
+  echo "$FILE1 does not exist"
+  exit 1
+fi
+if test ! -f "$FILE2"; then
+  echo "$FILE2 does not exist"
+  exit 1
+fi
+
+########################################################################
+# Step 2 - Initialise environment variables
+#
+PLATFORM=@platform@
+# VN here is automatically set in this script at each UM build
+VN=@vn@
+TARGET_MC=@target_mc@
+TMPDIR=$SCRATCH
+CUMFDIR=${CUMFDIR:-$TMPDIR}
+PRINT_STATUS=${PRINT_STATUS:-PrStatus_Oper}
+STASHMSTR=$UMDIR/vn$VN/ctldata/STASHmaster
+
+if [ $BUILD32 = "y" ] ; then
+  EXEC=${EXEC:-$UMDIR/vn$VN/$TARGET_MC/exec32}
+else
+  EXEC=${EXEC:-$UMDIR/vn$VN/$TARGET_MC/exec}
+fi
+
+
+######   Platform dependent environment variables                 ######
+
+if test $USTASH = "n"; then
+  USTSNUM=$CUMFDIR/namlst.$$
+  echo " &USTSNUM">$USTSNUM
+  echo " N_USTASH = 0 , NRECS_USTASH = 0 ,">>$USTSNUM
+  echo " USTSFILS= ''">>$USTSNUM
+  echo " /">>$USTSNUM
+fi
+########################################################################
+# Step 3 - Assign files
+#
+UNIT07=$CUMFDIR/cumf_summ.$$
+UNIT08=$CUMFDIR/cumf_temp.$$
+UNIT10=$CUMFDIR/cumf_diff.$$
+UNIT20=$FILE1
+UNIT21=$FILE2
+UNIT22=$STASHMSTR
+export UNIT07 UNIT08 UNIT10 UNIT20 UNIT21 UNIT22
+########################################################################
+# Step 4 - Execute utility & print out data
+#
+$EXEC/cumf.exe < $USTSNUM > $CUMFDIR/cumf_full.$$ 2>&1
+CC=$?
+if [ $CC != 0 ]
+then
+echo 'Problem with CUMF program'
+fi
+#
+cat $UNIT08>>$UNIT07
+
+echo 'Summary in:                       ',$UNIT07
+echo 'Full output in                    ',$CUMFDIR/cumf_full.$$
+echo 'Difference maps (if available) in:',$UNIT10
+#
+########################################################################
+# Step 5 - Delete temporary files and exit
+rm $CUMFDIR/namlst.$$ $CUMFDIR/cumf_temp.$$
+
+exit $CC

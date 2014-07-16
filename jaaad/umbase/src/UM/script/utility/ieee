@@ -1,0 +1,221 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script: ieee
+#
+#  Purpose: Converts contents of an atmosphere, ocean or ancillary
+#           file to IEEE format numbers.
+#
+#  Current Owner: W Roseblade    Date: 1/02/06
+#  Reviewer: M Saunby            Date: 1/02/06
+#
+#  Programming Standard: UMDP 3 version unknown
+#
+#  External documentation: UMDP unknown
+#
+#  Interface and arguments: ieee -32 / -64 -uSTASH ustsnum file1 file2
+#
+# Arguments: $3 or $5 arguments as
+# follows:
+#      $1 or $3           -32 or -64     Signifying 32-bit or 64-bit
+#                                        IEEE format
+#                         (-32e or -64e
+#                          -32E or -64E) (expanding fieldsfiles)
+#      $1 or $2           -uSTASH        User STASHmaster supplied
+#      following -uSTASH  USTSNUM        User STASHmaster file name
+#      penultimate        File 1         Input file name
+#      last               File 2         Output file name
+#
+#---------------------------------------------------------------------
+#
+#  Called by: user
+#  Calls:     none
+#
+#  Imports:
+#   PRINT_STATUS
+#   TMPDIR
+#   UMDIR
+#
+#  Exports: none
+#
+#  Local Variables:
+#   counter
+#   EXEC          - Directory containing executable
+#   FILE1
+#   FILE2
+#   PRECISION
+#   STASHMSTR
+#   USTASH
+#   USTSNUM
+#   VN
+#
+# End of header -------------------------------------------------------
+# Step 0 - Check call syntax
+#
+set -a
+if [ $# -ne 3 -a $# -ne 5 ]
+  then echo "$0: Usage is $0 -32 / -64 -uSTASH ustsnum file1 file2"
+  exit 1
+fi
+########################################################################
+# Step 1 - Initialise environment variables
+#
+PLATFORM=@platform@
+PRINT_STATUS=${PRINT_STATUS:-PrStatus_Oper}
+counter=0
+USTASH=n
+
+date=`date +%s`
+USTSNUM=$TMPDIR/namlst_${date}_$$
+
+echo " &USTSNUM">$USTSNUM
+echo " N_USTASH = 0 , NRECS_USTASH = 0 ,">>$USTSNUM
+echo " USTSFILS= ''">>$USTSNUM
+echo " /">>$USTSNUM
+########################################################################
+# Step 2 - Interpret arguments
+#
+# 1st argument
+#
+if [ "$1" = "-uSTASH" ]
+  then USTASH=y
+else
+  if test "$1" = "-32"
+    then
+    PRECISION=32
+  elif test "$1" = "-32e"
+    then
+    PRECISION=32e
+  elif test "$1" = "-32E"
+    then
+    PRECISION=32E
+  elif test "$1" = "-64"
+    then
+    PRECISION=64
+  elif test "$1" = "-64e"
+    then
+    PRECISION=64e
+  elif test "$1" = "-64E"
+    then
+    PRECISION=64E
+  else
+    echo "$1 illegal argument"
+    exit 1
+  fi
+fi
+#
+# 2nd argument
+#
+if [ "$1" = "-uSTASH" ]
+  then USTSNUM=$2
+elif [ "$2" = "-uSTASH" ]
+  then USTASH=y
+else
+  FILE1=$2
+  counter=1
+  if test ! -f "$FILE1"                    # Check if file1 exists
+    then
+    echo "$FILE1 does not exist"
+    exit 1
+  fi
+fi
+#
+# 3rd argument
+#
+if [ "$2" = "-uSTASH" ]
+  then USTSNUM=$3
+elif [ "$counter" = "1" ]
+  then FILE2=$3
+    counter=2
+  if test -f "$FILE2"
+    then
+    echo "$FILE2 already exists"           # Check if file2 exists
+    exit 1
+  fi
+else
+  if test "$1" = "-32"
+    then
+    PRECISION=32
+  elif test "$1" = "-32e"
+    then
+    PRECISION=32e
+  elif test "$1" = "-32E"
+    then
+    PRECISION=32E
+  elif test "$1" = "-64"
+    then
+    PRECISION=64
+  elif test "$1" = "-64e"
+    then
+    PRECISION=64e
+  elif test "$1" = "-64E"
+    then
+    PRECISION=64E
+  else
+    echo "$1 illegal argument"
+    exit 1
+  fi
+fi
+#
+# 4th argument
+#
+if [ "$counter" = "0" ]
+  then
+  FILE1=$4
+  counter=1
+  if test ! -f "$FILE1"                    # Check if file1 exists
+    then
+    echo "$FILE1 does not exist"
+    exit 1
+  fi
+fi
+#
+# 5th argument
+#
+if [ "$counter" = "1" ]
+  then
+  FILE2=$5
+  counter=2
+  if test -f "$FILE2"                     # Check if file2 exists
+    then
+    echo "$FILE2 already exists"
+    exit 1
+  fi
+fi
+########################################################################
+# Step 3 - Assign files
+#
+if [[ $PLATFORM = "CRAYPVP" || $PLATFORM = "CRAYMPP" ]] ; then
+  assign -a $FILE1 -su fort.20
+  #
+  assign -a $FILE2 -su fort.21
+else
+  UNIT20=$FILE1
+  UNIT21=$FILE2
+fi
+#
+# VN here is automatically set in this script at each UM build
+VN=@vn@
+TARGET_MC=@target_mc@
+STASHMSTR=$UMDIR/vn$VN/ctldata/STASHmaster
+EXEC=${EXEC:-$UMDIR/vn$VN/$TARGET_MC/exec}
+UNIT22=$STASHMSTR
+#
+########################################################################
+# Step 4 - Execute utility
+#
+$EXEC/convieee $PRECISION <$USTSNUM
+CC=$?
+if [ $CC != 0 ]
+then
+echo 'Problem with IEEE program'
+fi
+#
+########################################################################
+# Step 5 - Delete temporary files and exit
+rm $USTSNUM
+exit $CC

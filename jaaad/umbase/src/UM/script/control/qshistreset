@@ -1,0 +1,76 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script:  qshistreset
+#
+#  Purpose: Ensure only have current and previous history records in
+#           permanent history file ( Operational runs only )
+#
+#  Current Owner: W Roseblade    Date: 1/02/06
+#  Reviewer: M Saunby            Date: 1/02/06
+#
+#  Tested under OS version: UNICOS <unknown>
+#  UM   version no: ?    Date of test: ?
+#
+#  History:
+#   Model
+#  version  Date         Modification history:
+#    ?      10/01/92     Replaced references to TMPDIR by TEMP
+#                        R A Stratton
+#    ?       8/02/93     Environment variable FILENV removed, assign
+#                        statements replaced with UNIT environment
+#                        variables for FORTRAN I/O portability.
+#                        C S Douglas
+#    ?      17/12/933    Included details of imports,exports, and local
+#                        variables. C D Perks
+#    5.1    11/07/00     Variable Classification W Roseblade
+#    5.2    19/09/00     New Header Format W Roseblade
+#  6.2      25/08/06     Remove space between #! /bin/ksh W Roseblade.
+#
+#  Programming standard: UMDP 3 version unknown
+#
+#  External documentation:
+#    UMDP
+#
+#  Interface and arguments: $1 - Permanent History file (input/output)
+#
+#   -------------------------------------------------------------------
+#
+# Called by: UM final script
+# Calls    : none
+#
+#   Imports:
+#     OUTPUT        - Output file for the job step
+#     SETOPT        - Set shell options
+#
+#   Exports:
+#     UNIT10        - Permanent history file pathname
+#
+#   Local variables:
+#     CC            - Script/executable completion code
+#
+# End of header -------------------------------------------------------
+#L
+#L Step 0 - Setup environment variables
+#L
+set -$SETOPT
+#L
+#L Step 1  - Execute load module, appending standard output to OUTPUT
+#L
+UNIT10=$1
+export UNIT10
+#
+qxhistreset >>$OUTPUT
+#
+CC=$?
+if test $CC -ne 0
+then
+  echo "$0: Job failed"
+  exit 135
+else
+  echo "$0: Job terminated normally"
+fi

@@ -1,0 +1,251 @@
+#!/usr/bin/perl -w                                                         
+#    was #/usr/bin/perl -w                                                 
+# *****************************COPYRIGHT******************************     
+# (c) CROWN COPYRIGHT 2000, METEOROLOGICAL OFFICE, All Rights Reserved.    
+# P lease refer to file $UMDIR/vn$VN/copyright.txt" for further details    
+# ********************************************************************     
+#                                                                          
+#  Script:  qsmass                                                         
+#                                                                          
+#  Purpose: Archives both PP and sequential type datasets to MASS and      
+#           by calling ArchivetoMass. Also sends metadata info for PP      
+#           datasets to mass camelot directory by calling masscamelot.     
+#                                                                          
+#  Current Owner: W Roseblade                                              
+#  Reviewer     : SD Mullerworth  Date of review: ?                        
+#                                                                          
+#  Tested under OS version : 2.0.5.37                                      
+#  UM version no:      Date of test:                                       
+#                                                                          
+#  History:                                                                
+#  Model                                                                   
+#  Version  Date         Modification history:                             
+#    5.2    26/06/01     Original version. W Roseblade                     
+#    5.3    26/03/02     Various modifications to MASS code.               
+#                        W Roseblade.                                      
+#    5.4    26/11/02     Addition of test to detect zero bytes             
+#                        metadata files. W Roseblade                       
+#    5.5    31/03/03     Code changes to allow both CR and NWP to          
+#                        archive to MASS. W Roseblade.                     
+#    6.0     25/09/03    Remove CRACER/UABRF code W Roseblade.             
+#    6.1    02/08/04     NEC MASS refinements ie hall1,2                   
+#                        compatibility. W Roseblade.                       
+#    6.1    22/09/04     Improved metadata test to spot missing            
+#                        metadata files. W Roseblade                       
+#    6.2    19/01/05     Modify logic around hall setting               
+#                        W Roseblade.
+#    6.3    23/11/06     Mouse2 meta-data fixes.  Tidy code.  
+#                        Hackett, Saunby & Roseblade. Owner W Roseblade. 
+#    6.3    04/12/06     Lodged with FCM. M Saunby. 
+#
+#  Programming standard: UMDP 3, version 7.2                               
+#                                                                          
+#  External documentation: none                                            
+#                                                                          
+#  Interface and arguments:-                                               
+#   qsmass <CURRENT_RQST_NAME> <LOGNAME> <HOME> <VN>                       
+#          <TYPE> <USE_CAMELOT> <GENID> <NAMESPACE> <MAILSYS>
+#                                                                          
+#  CURRENT_RQST_NAME   - dataset ie abrtqa.daw9ch0                         
+#  LOGNAME             - users t20 ID.                                     
+#  HOME                - Users HOME directory                              
+#  VN                  - Experiment version ie 4.5.                        
+#  TYPE                - either NRUN or CRUN                               
+#  USE_CAMELOT         - true=create camelot metadata, false=don't create metadata
+#  GENID               - experiment GENeration ID (format is ABCDE001)     
+#  NAMESPACE           - MASS Namespace ie CRUMOP                        
+#  MAILSYS             - who to mail errors to for admin use (hadmass@hc0800)
+#                                                                          
+#  -------------------------------------------------------------------     
+#                                                                          
+#  Called externally by: qsserver                                                     
+#  Calls external: parsertrap                                                             
+#                                                                          
+#  Imports:                                                                
+#  CURRENT_RQST_NAME   - dataset ie abrtqa.daw9ch0                         
+#  LOGNAME             - users t20 ID.                                     
+#  HOME                - Users HOME directory                              
+#  VN                  - Experiment version ie 4.5.                        
+#  TYPE                - either NRUN or CRUN                               
+#  USE_CAMELOT         - true=create camelot metadata, false=don't create metadata
+#  GENID               - experiment GENeration ID (format is ABCDE001)     
+#  NAMESPACE           - MASS Namespace ie CRUMOP                         
+#  MAILSYS             - who to mail errors to for admin use (hadmass@hc0800)
+#                                                                          
+#  Exports: none                                                           
+#                                                                          
+#  Local variables:                                                        
+#  $namespace           - high level qualifier for database ie CRUM         
+#  $stream              - stream part of dataset, ie for abqwda.daw9ch0     
+#                         it would be ada.                                  
+#  $runid               - runid part of dataset, ie for abqwda.daw9ch0      
+#                         it would be abqwd.                                
+#  $userlabel           - The name to give the archived dataset on MASS     
+#  $mouseprv            - users mouseprv file ie $HOME/.MOUSEPrv.rc         
+#  @contents           - array containing contents of .MOUSEPrv.rc         
+#  $acctuserid          - MASS account userid ie T20IE                      
+#  $rc                  - Error return code from ArchivetoMASS              
+#  $found               - found flag (true/false)                           
+#  $stream              - dataset stream ie ada                             
+#  $userlabel           - dataset datestamp ie w9ch0                        
+#  $datatype            - UMPP for non-sequential type data                 
+#                         seq  for sequential type data                     
+#  $userid              - User ID ie t20ie                                  
+#  @out                 - array containing MASS archive command run         
+#                         along with any resulting output/errors            
+#                         from MASS.                                        
+#  $rc1                 - Error return code                                 
+#  $rc2                 - Error return code                                 
+#  $cmd                 - MASS archive command.                             
+#  $mdtemp              - MASS Metadata temp file.                          
+#  $date                - Current data                                      
+#  $host                - hostname of machine ie sn6702 for T3EA.           
+#  $formatversion       - Hardwired to MD1.                                 
+#  $size                - size in bytes of dataset.                         
+#  $hadid               - HP userid ie HADRO                                
+#  $t20xxdir            - t20xx directory ie /u/m20/cprod/t20xx             
+#  $lowerrunid          - lower case runid ie                               
+#  $timestamp           - timestamp in format 20010622125519                
+#  $output              - filename in t20xx directory                       
+#                         mass_acoqb_apa_aciqba.pa1923_t20mf_6.1_20010607_113417
+#  $error               - true/false error flag                             
+#  $host                - host being used ie sx614                          
+#  $number              - number part of host ie 14 if host is sx614        
+#  $hall                - hall being used ie either hall1 or hall2          
+#                                                                          
+# End of header -------------------------------------------------------    
+                                                                           
+# Set up directories,etc.                                                  
+                                                                           
+use strict;
+use File::Basename;
+
+# Assign command line arguments to variables.
+
+my ( $namespace, $stream,
+  $runid, $userlabel, $mouseprv, @contents, $acctuserid,
+  $number, $mdtemp, $rc, $found );
+
+my ($CURRENT_RQST_NAME,$USERID,$HOME,$VN,$TYPE,$USE_CAMELOT,$GENID,
+  $NAMESPACE,$MAILSYS)=@ARGV;
+
+# Extract acctuserid from users .MOUSEPrv.rc file using new
+# /critical/cprod/crscripts/bin/massid
+
+$acctuserid=`massid`;
+chomp $acctuserid;
+
+unless ( $acctuserid ){
+  print "qsmass: Failed to extract ACCTUSERID using massid.\n";
+  $?=1;
+  exit $?;
+}
+
+
+# Set up stream,runid and userlabel arguments for calling
+# ArchivetoMASS.
+
+( $stream=$CURRENT_RQST_NAME ) =~ s/.{5}(.).(.{2}).{3,5}/$1$2/;
+( $runid=$CURRENT_RQST_NAME ) =~ s/(.{5}).{7,9}/$1/;
+$userlabel=$CURRENT_RQST_NAME;
+
+# Calculate timestamp and create output filename.
+chomp(my $timestamp = `date +%Y%m%d%H%M%S`);
+my $mddate=substr($timestamp, 0,8)."_".substr($timestamp, 8, 6);
+my $output=lc("meta\_${runid}\_${stream}\_${userlabel}".
+           "\_${acctuserid}\_${VN}\_${mddate}");
+
+
+if ( $CURRENT_RQST_NAME =~ /^.{7}p.{4,6}/ ) {
+  $rc = ArchivetoMASS
+    ("$CURRENT_RQST_NAME",$acctuserid,$stream,$userlabel,
+     "UMPP",$USERID,$runid,$GENID,$NAMESPACE,$output,
+     $MAILSYS);
+
+  if ($rc ) {
+      $?=$rc;
+      exit $?;
+  }
+} else {
+  $rc = ArchivetoMASS
+    ("$CURRENT_RQST_NAME",$acctuserid,$stream,$userlabel,
+     "seq",$USERID,$runid,$GENID,$NAMESPACE,$MAILSYS);
+  if ($rc) {
+      $?=$rc;
+      exit $?;
+  }
+}
+
+
+# ArchivetoMass
+#   Archives selected dataset to MASS archiving system and also
+#   sends metadata info to a temp file for inclusion into the
+#   MASS camelot database.
+#
+# Arguments
+# CURRENT_RQST_NAME - The dataset name ie acqwda.daw9ch0
+# acctuserid        - Users T20 id.
+# stream            - The dataset stream ie ada
+# userlabel         - The name to give the archived dataset on MASS
+# datatype          - UMPP for pp type files, seq for sequential type
+#                     files ie dumps,boundary files.
+# userid            - Users t20 id.
+# runid             - experiments name ie abqwd
+# GENID             - New Generation ID ie ABCDE001
+# namespace         - Namespace into which dataset archived ie crumop
+# mdtemp            - Temp file for storing metadata.
+# mologs            - Logfile for MASS archive
+
+sub ArchivetoMASS {
+
+  my $CURRENT_RQST_NAME = shift;
+  my $acctuserid = shift;
+  my $stream = shift;
+  my $userlabel = shift;
+  my $datatype = shift;
+  my $userid = shift;
+  my $runid = shift;
+  my $GENID = shift;
+  my $namespace = shift;
+  my $mdtemp;
+
+  if ($datatype eq "UMPP") {
+    $mdtemp = shift;
+  }
+
+  my $MAILSYS = shift;
+  my ($out, $rc1, $rc2, $cmd, @out, $errmess);
+
+  chomp ( my $date = `date +%Y%m%d.%H%M%S` );
+
+
+  chomp ( my $location = `pwd` );
+
+  $cmd  = "trap2 P ";
+  $cmd .= "-U $acctuserid -L $namespace -z $runid ";
+  $cmd .= "-s $stream -r $datatype -H $userlabel ";
+  $cmd .= "-G $GENID ";
+  if (($datatype eq "UMPP") && ( $USE_CAMELOT eq "true" )) {
+    $cmd .= "-A $mdtemp ";
+  }
+  $cmd .= "${location}/$CURRENT_RQST_NAME";
+
+
+  if ($datatype eq "UMPP") {
+    # remove any previous mdtemp file from outage.
+    unlink $mdtemp if -e $mdtemp;
+  }
+
+  print "Mass command is:\n";
+  print "$cmd\n";
+
+  @out = `$cmd 2>&1`;
+  $rc1 = $?;
+  if ($rc1) {
+    # Real error !
+    print @out;
+    $rc2=$rc1 >>8;
+    $rc1=$rc2;
+  }
+  return $rc1;
+}

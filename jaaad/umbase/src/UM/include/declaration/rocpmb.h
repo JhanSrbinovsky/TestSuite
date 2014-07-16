@@ -1,0 +1,37 @@
+! ROCPMB; for ocean assimilation; documented in CODPMB
+!
+! History:
+! Version  Date     Comment
+! -------  ----     -------
+!  5.5 27/02/03 Changes for upgrade to FOAM data assimilation. A. Hines
+!
+      REAL :: O_TIM_WIN_STR_G(NO_GRP_MAX)
+      REAL :: O_TIM_WIN_FIN_G(NO_GRP_MAX)
+      REAL :: O_CS_AvVal_WE_G(NO_SPL_CV,NO_GRP_MAX)
+      REAL :: O_CS_AvVal_NS_G(NO_SPL_CV,NO_GRP_MAX)
+      REAL :: O_CS_LatRef_WE_G(NO_SPL_CV,NO_GRP_MAX)
+      REAL :: O_CS_LatRef_NS_G(NO_SPL_CV,NO_GRP_MAX)
+      REAL :: O_CS_LonRef_WE_G(NO_SPL_CV,NO_GRP_MAX)
+      REAL :: O_CS_LonRef_NS_G(NO_SPL_CV,NO_GRP_MAX)
+      REAL :: O_CS_DepRef_WE_G(NO_SPL_CV,NO_GRP_MAX)
+      REAL :: O_CS_DepRef_NS_G(NO_SPL_CV,NO_GRP_MAX)
+      REAL :: O_CS_PAmp_WE_G(NO_CSF_MAX,NO_SPL_CV,NO_GRP_MAX)
+      REAL :: O_CS_PAmp_NS_G(NO_CSF_MAX,NO_SPL_CV,NO_GRP_MAX)
+      REAL :: O_CS_PScl_WE_G(NO_CSF_MAX,NO_SPL_CV,NO_GRP_MAX)
+      REAL :: O_CS_PScl_NS_G(NO_CSF_MAX,NO_SPL_CV,NO_GRP_MAX)
+      REAL :: O_VRT_CS_G(NO_SPL_CV,NO_GRP_MAX)
+
+      INTEGER :: JO_NO_ITS_G(NO_GRP_MAX)
+      INTEGER :: JO_INT_ITS_G(NO_GRP_MAX)
+      INTEGER :: JO_IT_NO_G(NO_GRP_MAX)
+      INTEGER :: JO_IT_SET_COL_GRP(NO_GRP_MAX)
+      INTEGER :: JO_COR_TIM_FNC_G(NO_GRP_MAX)
+      INTEGER :: JO_WTS_TIM_FNC_G(NO_GRP_MAX)
+      INTEGER :: JO_INC_TIM_FNC_G(NO_GRP_MAX)
+      INTEGER :: KO_LEV_LOW_G(NO_GRP_MAX)
+      INTEGER :: JO_CS_PFn_WE_G(NO_CSF_MAX,NO_SPL_CV,NO_GRP_MAX)
+      INTEGER :: JO_CS_PFn_NS_G(NO_CSF_MAX,NO_SPL_CV,NO_GRP_MAX)
+
+      LOGICAL :: LLO_ANA_G(NO_GRP_MAX)
+      LOGICAL :: LLO_FILTER_G(NO_GRP_MAX)
+! ROCPMB end

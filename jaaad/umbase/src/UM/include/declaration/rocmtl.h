@@ -1,0 +1,10 @@
+! ROCMTL; for ocean assimilation; documented in CODMTL
+      INTEGER :: I_PO_TYP(NO_TYP_MAX+1)
+      INTEGER :: I_PO_ABS(NO_TYP_MAX)
+      INTEGER :: IRM_CO_ORD(NO_TYP_MAX)
+      INTEGER :: IRM_EL(NO_TYP_MAX)
+      INTEGER :: NO_EL_TYP(NO_TYP_MAX)
+      INTEGER :: I_EL_TYP(NO_EL_MAX, NO_TYP_MAX)
+      INTEGER :: I_PO_C_E(NO_PO_MAX)
+      INTEGER :: LEV_TYP_NO(NO_PO_MAX)
+! ROCMTL end

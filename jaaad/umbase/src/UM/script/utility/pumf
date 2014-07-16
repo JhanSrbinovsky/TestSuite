@@ -1,0 +1,191 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script: pumf
+#
+#  Purpose: Unified Model File Print Utility Script that prints a
+#           summary of contents of an atmosphere, ocean or ancillary
+#           file.
+#
+#  Current Owner: W Roseblade    Date: 1/02/06
+#  Reviewer: M Saunby            Date: 1/02/06
+#
+#
+#  Programming standard: UMDP 3, version unknown
+#
+#  External documentation:
+#    <UMDP number & name of external documentation>
+#
+# Interface and Arguments:
+#
+#   pumf [-uSTASH USTSNUM][-dOUT PUMFDIR][-o NPRINT][-x XPRINT] file1
+#
+#   $1 (optional) -uSTASH <USTSNUM> : User STASHmaster file name
+#   $2 (optional) -dOUT <PUMFDIR>   : User specified output dir
+#   $3 (optional) -o <NPRINT>       : Number of observations
+#                                     to be printed from
+#                                     observation file
+#                                     (default NPRINT=8)
+#   $4 (optional) -x <XPRINT>       : Number of extra data values
+#                                     to be printed
+#                                     (default XPRINT=5)
+#   $5 (optional) -32               : Use 32-bit executable
+#   $6                              : File name
+#
+#   -------------------------------------------------------------------
+#
+#  Script called by: user
+#  Script calls: pumf utility
+#
+#  Imports:
+#    PRINT_STATUS  -  Print status
+#    TMPDIR        -  Temporary directory
+#    PUMFDIR       -  Output directory
+#
+#  Exports:
+#    UNIT22        -  Stashmaster file
+#    UNIT07
+#
+#  Local Variables:
+#    EXEC          -  Directory containing executable
+#    FILE1         -  First argument
+#    LPRINT
+#    NPRINT        -  Number of observations to be printed from
+#                     observation file (default NPRINT=8)
+#    XPRINT        -  Number of extra data values to be printed
+#                     (default XPRINT=5)
+#    STASHMSTR     -  Stashmaster file
+#    USTASH        -  User STASHmaster file flag
+#    USTSNUM       -  User STASHmaster file name
+#    VN            -  UM version number
+#    BUILD32       -  Using 32-bit executable
+#    counter       -  counter
+#
+# End of header -------------------------------------------------------
+# Step 00 - Check call syntax
+#
+set -a
+
+cmessage="$0: Usage is $0 [-32] -uSTASH ustsnum -o NPRINT \
+-dOUT PUMFDIR -x XPRINT file1"
+if [ $# -lt 1 -o $# -gt 10 ]
+then
+  echo $cmessage ; exit 1
+fi
+########################################################################
+# Step 0 - Initialise local variables
+#
+PLATFORM=@platform@
+
+PRINT_STATUS=${PRINT_STATUS:-PrStatus_Diag}
+LPRINT=n
+NPRINT=8
+counter=0
+USTASH=n
+BUILD32=n
+
+########################################################################
+# Step 1 - Interpret arguments
+#
+
+cline=$*
+
+# parse command line options
+for arg in $cline
+do
+  case $arg in
+       '-uSTASH') if test "$1" != "-uSTASH"; then
+                    echo $cmessage; exit 1
+                  else
+                    USTASH=y ; USTSNUM=$2 ; shift 2
+                  fi ;;
+         '-dOUT') if test "$1" != "-dOUT"; then
+                    echo $cmessage; exit 1
+                  else
+                    PUMFDIR=$2 ; shift 2
+                  fi ;;
+            '-o') if test "$1" != "-o"; then
+                    echo $cmessage; exit 1
+                  else
+                    LPRINT=y ; NPRINT=$2 ; shift 2
+                  fi ;;
+           '-32') if test "$1" != "-32" ; then
+                    echo $cmessage; exit 1
+                  else
+                    BUILD32=y ; shift 1
+                  fi ;;
+            '-x') if test "$1" != "-x"; then
+                    echo $cmessage; exit 1
+                  else
+                    XPRINT=$2 ; shift 2
+                  fi ;;
+              -s) echo "Printing Summary Only"
+                  SUMMARY=true
+                  shift 1 ;;
+              -*) echo "Error: bad arg \"$1\""
+                  echo $cmessage
+                  exit 1 ;;
+  esac
+done
+
+
+if [ $# -ne 1 ]; then
+  echo $cmessage; exit 1
+fi
+
+FILE1=$1
+
+if test ! -f $FILE1; then
+  echo "$FILE1 does not exist"; exit 1
+fi
+
+########################################################################
+# Step 3 - Assign files
+#
+# VN here is automatically set in this script at each UM build
+VN=@vn@
+PUMFDIR=${PUMFDIR:-$SCRATCH}
+TARGET_MC=@target_mc@
+STASHMSTR=$UMDIR/vn$VN/ctldata/STASHmaster
+if [ $BUILD32 = "y" ] ; then
+  EXEC=${EXEC:-$UMDIR/vn$VN/$TARGET_MC/exec32}
+else
+  EXEC=${EXEC:-$UMDIR/vn$VN/$TARGET_MC/exec}
+fi
+
+UNIT22=$STASHMSTR
+UNIT07=$PUMFDIR/pumf_head.$$
+export UNIT07 UNIT22
+
+######   Platform dependent environment variables                 ######
+
+
+if test $USTASH = "n"; then
+  USTSNUM=$PUMFDIR/namlst.$$
+  echo " &USTSNUM">$USTSNUM
+  echo " N_USTASH = 0 , NRECS_USTASH = 0 ,">>$USTSNUM
+  echo " USTSFILS= ''">>$USTSNUM
+  echo " /">>$USTSNUM
+fi
+
+########################################################################
+# Step 4 - Execute utility & print out data
+#
+$EXEC/pumf.exe < $USTSNUM 1>$PUMFDIR/pumf_field.$$ 2>&1
+CC=$?
+if [ $CC != 0 ]
+then
+echo 'Problem with PUMF program'
+fi
+#
+echo 'Header output in:',$PUMFDIR/pumf_head.$$
+echo 'Field output in:',$PUMFDIR/pumf_field.$$
+#
+########################################################################
+# Step 5 - Delete temporary files and exit
+test -f $PUMFDIR/namlst.$$ && rm $PUMFDIR/namlst.$$
+exit $CC

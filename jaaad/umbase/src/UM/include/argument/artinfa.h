@@ -1,0 +1,19 @@
+#if defined(ATMOS)
+!L
+!L 14/6/94  DEF LBOUTA replaced by ATMOS-V3.4   S.J.Swarbrick
+!L 29/7/98  Add 4 new arguments. D. Robinson.
+!L 10/11/00 5.2 Add arguments 26 & 27. D.Robinson
+!L 18/08/04 6.1 Add arguments 28-33. D.Robinson
+!L
+!L --------------- Interface arrays out(atmosphere)-------------
+A_SPINF(A_IXINF( 1)),A_SPINF(A_IXINF( 2)),A_SPINF(A_IXINF( 3)),A_SPINF         &
+(A_IXINF( 4)),A_SPINF(A_IXINF( 5)),A_SPINF(A_IXINF( 6)),A_SPINF(A_IXINF( 7)),  &
+A_SPINF(A_IXINF( 8)),A_SPINF(A_IXINF( 9)),A_SPINF(A_IXINF(10)),A_SPINF         &
+(A_IXINF(11)),A_SPINF(A_IXINF(12)),A_SPINF(A_IXINF(13)),A_SPINF(A_IXINF(14)),  &
+A_SPINF(A_IXINF(15)),A_SPINF(A_IXINF(16)),A_SPINF(A_IXINF(17)),A_SPINF         &
+(A_IXINF(18)),A_SPINF(A_IXINF(19)),A_SPINF(A_IXINF(20)),A_SPINF(A_IXINF(21)),  &
+A_SPINF(A_IXINF(22)),A_SPINF(A_IXINF(23)),A_SPINF(A_IXINF(24)),A_SPINF         &
+(A_IXINF(25)),A_SPINF(A_IXINF(26)),A_SPINF(A_IXINF(27)),A_SPINF(A_IXINF(28)),  &
+A_SPINF(A_IXINF(29)),A_SPINF(A_IXINF(30)),A_SPINF(A_IXINF(31)),A_SPINF         &
+(A_IXINF(32)),A_SPINF(A_IXINF(33)),A_SPINF(A_IXINF(34)),A_SPINF(A_IXINF(35)),  &
+#endif

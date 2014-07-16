@@ -1,0 +1,97 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script: qscombine
+#
+#  Purpose: combine control and history files, giving interim history
+#
+#  Current Owner: W Roseblade    Date: 1/02/06
+#  Reviewer: M Saunby            Date: 1/02/06
+#
+#  Tested under OS version: UNICOS unknown
+#  UM   version no: ?    Date of test:  10/01/92
+#
+#  History:
+#   Model
+#  version  Date         Modification history:
+#    ?      10/01/92     Replaced TMPDIR by TEMP. R A Stratton
+#    ?      8/02/93      Environment variable FILENV removed,assign
+#                        statements replaced with UNIT environment
+#                        variables for FORTRAN I/O portability.
+#                        C S Douglas.
+#    ?      17/12/93     Included details of imports,exports and local
+#                        variables.C D Perks
+#    ?      16/05/95     Removed unit 1 and 9 (housekeeping and interim)
+#                        and placed these in qspickup and qssetup.  I
+#                        C D Perks
+#    ?      17/02/96     Added assign statements for namelist reads.
+#                        L Wiles
+#    5.1    10/07/00     Variable Classification  W Roseblade
+#    5.2    19/09/00     New Header Format W Roseblade
+#    5.3    30/08/01     Replace nupdate directives with unix variables
+#                        (R.S.Hatcher)
+#  6.2      25/08/06     Remove space between #! /bin/ksh W Roseblade.
+#
+#  Programming Standard: UMDP 3 version unknown
+#
+#  External documentation:
+#    <UMDP number & name of external documentation> Y1 ?
+#
+# Interface and Arguments:
+#            $1 - History file (input)
+#            $2 - Interim control file (input)
+#            $3 - Operational houskeeping file (input)
+#            $4 - Interim history file (output)
+#            $5 - FORTRAN unit assignment file (output)
+#
+#---------------------------------------------------------------------
+#
+# Called by: UM prelim script
+# Calls    : none
+#
+#   Imports:
+#     CRAYF90  - Running on CRAYF90 platform
+#     OUTPUT   - Printed output file pathname
+#     SETOPT   - Set shell options
+#     TMPDIR   - Temp directory
+#
+#   Exports:
+#     UNIT10   - Permanent history file pathname
+#     UNIT11   - Interim history file pathname
+#     UNIT13   - Machineable version of external file table
+#   Local variables:
+#     CC       - Script/executable completion code
+#
+# End of header -------------------------------------------------------
+#L
+#L Step 0 - Setup environment variables
+#L
+set -$SETOPT
+#L
+#L Step 1  - Execute load module, appending standard output to OUTPUT
+#L
+UNIT10=$1
+UNIT11=$2
+UNIT13=$3
+export UNIT10 UNIT11 UNIT13
+#
+if [[ $CRAYF90 = true ]]; then
+  FILENV=$TMPDIR/qxcombine_assign
+  assign -R qxcombine_assign
+  assign -f 77 g:sf
+fi
+#
+qxcombine >>$OUTPUT
+#
+CC=$?
+if test $CC -ne 0
+then
+  echo "$0: Job failed"
+  exit 135
+else
+  echo "$0: Job terminated normally"
+fi

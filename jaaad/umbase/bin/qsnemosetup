@@ -1,0 +1,357 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script:  qsnemosetup
+#
+#  Purpose: Set up namelist for running the NEMO Ocean model, 
+#           either as part of a coupled configuration
+#           or standalone.
+#
+#  Programming Standard: UMDP 3 version unknown
+#
+#  External documentation:
+#    <UMDP number & name of external documentation> Y1 ?
+#
+#
+#   -------------------------------------------------------------------
+#
+#   Called by: qsexecute (when coupled to UM), qsnemorun (standalone)
+#   Calls:     
+#
+#  Imports:
+#
+#    AUTO_RESUB         - flag to indicate if automatic resubmission needed
+#    DATAM	        - Directory name in which model executes
+#    NEMO_INPUT         - Location of NEMO input files (specified in UMUI)
+#    NEMO_NPROC	        - Number of processors NEMO will run on
+#    NEMO_NL	        - Path of NEMO namelist (specified in UMUI)
+#    NEMO_NL_ICE        - Path of NEMO LIM ice namelist (specified in UMUI)
+#    NEMO_START         - NEMO start dump (specified in UMUI)
+#    RUN_LEN_DAYS       - Run length (days) specified in UMUI
+#    RUN_LEN_MONTHS     - Run length (months) specified in UMUI
+#    RUN_LEN_YEARS      - Run length (years) specified in UMUI
+#    RESUB_INC_DAYS	- Resubmission interval (days) specified in UMUI
+#    RESUB_INC_MONTHS   - Resubmission interval (months) specified in UMUI
+#    RESUB_INC_YEARS    - Resubmission interval (years) specified in UMUI
+#    RUNID              - Experiment/job ie abcde
+#    TYPE	        - NRUN (normal run) or CRUN (continuation run)
+#
+#  Exports:
+#
+#  Local Variables:
+#
+#    NUMCORE		- Variable to check for any core files left around
+#    NEMO_DAYS_RUN      - Number of timesteps completed on previous run
+#    NEMO_FIRST_STEP	- First timestep executed by NEMO on a previous run
+#    NEMO_LAST_STEP	- Last timestep executed by NEMO on a previous run
+#    NEMO_NEXT_STEP	- Next NEMO timestep to execute (for CRUN)
+#    NEMO_FINAL_STEP	- Final NEMO tinestep to be executed in this run
+#    NEMO_STEP_INT      - NEMO timestep length
+#    NEMO_RESUB_FILE    - Holds details for NEMO standalone auto resub
+#    RESTART_FILES	- Variable to hold number of previous restart files
+#    RESUB_INC_SEC	- Total resubmission interval calaculated as seconds
+#    RUN_LEN_SEC	- Total run length calaculated as seconds
+#    RUN_LEFT           - For CRUN, amount left to run from resub file
+#    NEXT_JOBNAME       - Used to set new JOBNAME for auto CRUN
+#    NEXT_JOBNUM        - Used to calculate new run number for auto CRUN
+#    NEXT_RUN_LEFT      - For CRUN, calculated amount left to run
+#    TOTAL_DAYS		- Total run/resubmission interval calaculated as days
+#    TOTAL_RUN_DAYS     - Total run length calaculated as days
+
+
+
+
+echo "TYPE is :$TYPE"
+
+if [ $TYPE = CRUN ]; then
+
+export NEMO_RESUB_FILE=$DATAM/nemo_resub
+
+  # If this is a CRUN we need to calculate the NEMO start and end
+  # timesteps based upon the resubmit interval and the last NEMO 
+  # namelist created.
+  # Also need to reinitialise nstock to make sure we get restart files
+  # produced correctly for this run
+
+  NEMO_LAST_STEP=`grep 'nitend.*=' $DATAM/namelist|awk -F ' ' {'print $3'}`
+  NEMO_STEP_INT=`grep '^\ *rdt\ .*=' $DATAM/namelist|awk -F ' ' {'print $3'} \
+         |awk -F '.' {'print $1'}`
+  NUMCORE=$(ls $DATAM/core* 2>/dev/null | wc -l)
+  RESTART_FILES=$(ls $DATAM/*${LAST_STEP}_restart*.nc 2>/dev/null | wc -l)
+  
+  
+  
+
+  if [[ -s $DATAM/ocean.output || $NUMCORE -gt 0 || $RESTART_FILES -lt 1 ]] 
+  then
+      echo "NEMO: Deleting files from failed run"
+      rm -rf $DATAM/core* $DATAM/ocean.output $DATAM/solver.stat 2>/dev/null
+      rm -rf $DATAM/*${NEMO_LAST_STEP}_restart*.nc 2>/dev/null
+      NEMO_FIRST_STEP=`grep 'nit000     =' $DATAM/namelist|awk -F ' ' {'print $3'}`
+      echo "NEMO: Going back to timestep $NEMO_FIRST_STEP following failure"
+  else
+
+      NEMO_DAYS_RUN=`expr $NEMO_LAST_STEP '*' $NEMO_STEP_INT '/' 86400`  
+
+      NEMO_NEXT_STEP=`expr $NEMO_LAST_STEP + 1`
+
+      TOTAL_RUN_DAYS=`expr $RUN_LEN_YEARS '*' 360 '+' $RUN_LEN_MONTHS '*' 30 '+' $RUN_LEN_DAYS`
+      
+      
+      if [[ $AUTO_RESUB = "Y" ]]
+      then
+      
+          # Use Resub increments as length for this run 
+
+        TOTAL_DAYS=`expr $RESUB_INC_YEARS '*' 360 '+' $RESUB_INC_MONTHS '*' 30 '+' $RESUB_INC_DAYS`
+	
+      else
+      
+          # Calculate run length as total - previous
+	  
+	TOTAL_DAYS=`expr $TOTAL_RUN_DAYS '-' $NEMO_DAYS_RUN`
+	  
+      fi
+
+      RESUB_INC_SEC=`expr $TOTAL_DAYS '*' 86400`
+
+      NEMO_FINAL_STEP=`expr $RESUB_INC_SEC '/' $NEMO_STEP_INT '+' $NEMO_LAST_STEP `
+    
+
+      echo "NEMO: Editing namelist for CRUN...."
+
+ed $DATAM/namelist <<EOF
+/ln_rstart.*=/
+c
+   ln_rstart  = .true.
+.
+/nrstdt.*=/
+c
+   nrstdt  = 2
+.
+/nit000.*=/
+c
+   nit000     = $NEMO_NEXT_STEP
+.
+/nitend.*=/
+c
+   nitend     = $NEMO_FINAL_STEP
+.
+w
+q
+EOF
+
+      # Link restart files so that last output one becomes next input one:
+      
+      # Firstly we need to check for existence of old restart.nc/restart_ice_in.nc links
+      # and get rid of it before remaking links. This is because a previous multi PE NRUN may have
+      # been initiated with a single restart file which will work OK but then produces per
+      # PE restart files and it is these that are required to be used for the CRUN.
+      
+    if [[ -L $DATAM/restart.nc ]]
+    then
+    
+       rm -f $DATAM/restart.nc 1>/dev/null 2>&1
+       
+    fi
+    
+    if [[ -L $DATAM/restart_ice_in.nc ]]
+    then
+    
+       rm -f $DATAM/restart_ice_in.nc 1>/dev/null 2>&1
+       
+    fi
+    
+
+      if [[ $NEMO_NPROC -eq 1 ]]
+      then
+
+  
+         ln -s -f $DATAM/${RUNID}o_*${NEMO_LAST_STEP}_restart.nc $DATAM/restart.nc
+         if [ -s $DATAM/${RUNID}o_*${NEMO_LAST_STEP}_restart_ice.nc ] ; then 
+                ln -s -f $DATAM/${RUNID}o_*${NEMO_LAST_STEP}_restart_ice.nc $DATAM/restart_ice_in.nc
+         fi
+      else
+  
+         typeset -Z4 i=0
+     
+         while [ $i -lt $NEMO_NPROC ]
+         do
+           ln -s -f $DATAM/${RUNID}o_*${NEMO_LAST_STEP}_restart_${i}.nc $DATAM/restart_${i}.nc
+           if [ -s $DATAM/${RUNID}o_*${NEMO_LAST_STEP}_restart_ice_${i}.nc ] ; then
+                  ln -s -f $DATAM/${RUNID}o_*${NEMO_LAST_STEP}_restart_ice_${i}.nc $DATAM/restart_ice_in_${i}.nc
+           fi
+           let i=$i+1
+         done
+      fi
+      
+        # If Auto resub has been enabled, check for existing NEMO resubmit file
+        # or create one if required
+	
+     if [[ $AUTO_RESUB = "Y" ]]
+     then
+
+       if [[ -r $DATAM/nemo_resub ]]
+       then
+
+            # Existing resub file
+
+        RUN_LEFT=`grep 'RUN_LEFT=' $DATAM/nemo_resub|awk -F '=' {'print $2'}`
+  
+        NEXT_RUN_LEFT=`expr $RUN_LEFT '-' $TOTAL_DAYS`
+
+  
+         if [ $NEXT_RUN_LEFT -gt 0 ]; then
+  
+              # More left to run so edit new details into resub file
+
+          JOBNAME=`grep 'JOBNAME=' $DATAM/nemo_resub|awk -F '=' {'print $2'}`
+          JOBNUM=`expr 'substr' $JOBNAME 6 3`
+          export NEXT_JOBNUM=`expr $JOBNUM '+' 1`
+
+          length=`echo $NEXT_JOBNUM | wc -c | cut -c1-8`
+          length=`expr $length '-' 1`
+
+          if [[ $length = 1 ]]
+	  then
+
+           NEXT_JOBNAME=${RUNID}00${NEXT_JOBNUM}
+ 
+          elif [[ $length = 2 ]]
+	  then
+
+           NEXT_JOBNAME=${RUNID}0${NEXT_JOBNUM}
+ 
+          else
+
+           NEXT_JOBNAME=${RUNID}${NEXT_JOBNUM}
+ 
+          fi
+    
+ed $DATAM/nemo_resub <<EOF
+/FLAG/
+c
+FLAG='Y'
+.
+/RUN_LEFT/
+c
+RUN_LEFT=$NEXT_RUN_LEFT
+.
+/JOBNAME/
+c
+JOBNAME=$NEXT_JOBNAME
+.
+w
+q
+EOF
+  
+         else
+  
+              # Finished total run, delete resub file
+    
+           rm -rf $DATAM/nemo_resub
+
+         fi
+  
+       else
+
+            # Create resub file for next CRUN auto submit
+
+         NEXT_RUN_LEFT=`expr $TOTAL_RUN_DAYS '-' $TOTAL_DAYS '-' $NEMO_DAYS_RUN`
+  
+ 
+         if [[ $NEXT_RUN_LEFT -gt 0 ]]
+	 then
+  
+             # Create NEMO resubmit file for automatic resubmission of CRUNs
+    
+cat > $DATAM/nemo_resub <<EOF
+FLAG='Y'
+RUN_LEFT=$NEXT_RUN_LEFT
+JOBNAME=${RUNID}001
+EOF
+
+         fi
+  
+       fi # Check for existing resub file when Auto Resubmitting
+       
+     fi # Check for Auto Resubmission
+
+  fi # Check for failed run
+
+else   # Not a CRUN
+
+
+  echo "NEMO: Deleting files from any previous runs"
+
+  rm -rf $DATAM/core* $DATAM/ocean.output $DATAM/solver.stat $DATAM/nemo_resub* 2>/dev/null
+  
+   # Check for existing restart files and print a warning but do not delete in case they
+   # are genuinely needed
+   
+  RESTART_FILES=$(ls $DATAM/*restart*.nc 2>/dev/null | wc -l)
+  
+  if [[ $RESTART_FILES -gt 0 ]] 
+  then
+      echo ""
+      echo "WARNING: This is an NRUN and NEMO restart files exist"
+      echo "if they are not genuinely needed you must delete before re-running"
+      echo ""
+
+  fi
+
+   # This is an NRUN so copy in and edit namelist
+
+  cp $NEMO_NL $DATAM/namelist
+  
+   # Only copy ice namelist if it has been set and exists
+   
+  if [[ -r "$NEMO_NL_ICE" ]] 
+  then
+  
+   cp $NEMO_NL_ICE $DATAM/namelist_ice
+   
+  fi
+  
+   # If a start dump has been specifed and exists then link in to run directory
+   
+  if [[ -r "$NEMO_START" ]] 
+  then
+  
+   ln -s $NEMO_START $DATAM/restart.nc
+   
+  fi
+ 
+  NEMO_FIRST_STEP=`grep 'nit000.*=' $DATAM/namelist|awk -F ' ' {'print $3'}`
+  NEMO_STEP_INT=`grep '^\ *rdt\ .*=' $DATAM/namelist|awk -F ' ' {'print $3'} \
+          |awk -F '.' {'print $1'}`
+
+
+  TOTAL_DAYS=`expr $RUN_LEN_YEARS '*' 360 '+' $RUN_LEN_MONTHS '*' 30 '+' $RUN_LEN_DAYS`
+
+  RUN_LEN_SEC=`expr $TOTAL_DAYS '*' 86400`
+
+  NEMO_FINAL_STEP=`expr $RUN_LEN_SEC '/' $NEMO_STEP_INT '+' \
+                 $NEMO_FIRST_STEP  '-' 1`
+
+ed $DATAM/namelist <<EOF
+/cexper.*=/
+c
+   cexper     = "${RUNID}o"
+.
+/nitend.*=/
+c
+   nitend     = $NEMO_FINAL_STEP
+.
+w
+q
+EOF
+
+fi # Check for CRUN/NRUN
+
+
+#L----------------------------------------------------------------------

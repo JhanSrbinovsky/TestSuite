@@ -1,0 +1,82 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script:  qshistprint
+#
+#  Purpose: To print out the contents of history file records
+#
+#  Current Owner: W Roseblade    Date: 1/02/06
+#  Reviewer: M Saunby            Date: 1/02/06
+#
+#  Tested under OS version: UNICOS <unknown>
+#  UM   version no: ?    Date of test: ?
+#
+#  History:
+#   Model
+#  version  Date         Modification history:
+#    ?      10/01/92     Replaced references to TMPDIR by TEMP
+#                        R A Stratton
+#    ?      8/02/93      Environment variable FILENV removed, assign
+#                        statements replaced with UNIT environment
+#                        variables for FORTRAN I/O portability.
+#                        C S Douglas
+#    ?      17/12/93     Included details of imports,exports and local
+#                        variables. C D Perks
+#    5.1    11/07/00     Variable Classification. W Roseblade
+#    5.2    19/09/00     New Header Format W Roseblade
+#    6.2    11/05/05     "set" command added. Adam Clayton
+#  6.2      25/08/06     Remove space between #! /bin/ksh W Roseblade.
+#
+#  Programming standard: UMDP 3 version unknown
+#
+#  External documentation:
+#    UMDP
+#
+#  Interface and arguments: qshistprint <History file> <Resubmit file>
+#
+# Arguments: $1 - History file  (input)
+#            $2 - Resubmit file (output)
+#
+#   -------------------------------------------------------------------
+#
+# Called by: UM final script
+# Calls    : none
+#
+#  Imports:
+#    HISTNLIST    - History file namelist
+#    OUTPUT       - Printed output file pathname
+#
+#  Exports:
+#    UNIT10       - Permanent history file pathname
+#    UNIT07       - Error output for operators-operational model
+#
+#  Local variables:
+#    CC           - Script/executable completion code
+#
+# End of header -------------------------------------------------------
+#L
+#L Step 0 - Setup environment variables
+#L
+set -$SETOPT
+#L
+#L Step 1  - Execute load module, appending standard output to OUTPUT
+#L           and reading user supplied namelist data on standard input
+#L
+UNIT10=$1
+UNIT07=$2
+export UNIT10 UNIT07
+#
+qxhistreport <$HISTNLIST >>$OUTPUT
+#
+CC=$?
+if test $CC -ne 0
+then
+  echo "$0: Job failed"
+  exit 135
+else
+  echo "$0: Job terminated normally"
+fi

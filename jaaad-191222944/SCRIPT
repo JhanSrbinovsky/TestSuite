@@ -1,0 +1,303 @@
+echo "NEMO_NPROC $NEMO_NPROC CICE_NPROC $CICE_NPROC"
+
+UM_START_MAIL=true
+UM_MAIL_ID=srb001@csiro.au
+
+echo "*****************************************************************"
+echo "     Version 7.3 template, Unified Model ,  Non-Operational"
+echo "     Created by UMUI version 7.3.1                       "
+echo "*****************************************************************"
+
+# Model version number
+export VN=7.3                
+
+. $UMDIR/vn$VN/$TARGET_MC/scripts/.umsetvars_$VN
+if test -s $HOME/.umsetvars_$VN ; then
+  echo "Sourcing $HOME/.umsetvars_$VN"
+  . $HOME/.umsetvars_$VN
+fi
+. $UMDIR/vn$VN/$TARGET_MC/scripts/umprofile
+# set UI system variables
+. $UMDIR/vn$VN/$TARGET_MC/scripts/setglobalvars 
+
+export GEN_MACHINE=${GEN_MACHINE:-${UMMACHINE}}
+
+##############################################################
+# Set up UM environment variables for export to lower shells #                        #
+##############################################################
+###################################################
+# Run Identifier and Temporary Dir details        #
+###################################################
+
+export EXPTID=jaaa
+EXPTALIAS="NONE"
+export JOBID=d
+export RUNID=$EXPTID$JOBID
+export JOB_LINE='cp jaaaC - works - use my branch here + user prog'
+
+
+###################################################
+# Flag to indicate fully coupled HadGEM3 run      #
+###################################################
+
+export HADGEM3_COUPLED=false
+
+###################################################
+# OASIS coupling flag                             #
+###################################################
+ 
+export OASIS=false   
+ 
+if test $UMMACHINE = 'METOCRAY' -o $UMMACHINE = 'NECSX6' -o $UMMACHINE = 'IBM'
+then
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### START of non-portable block (UKMO ONLY)
+
+# TBD-IBM This needs setting when IBM locations for opstoprun directories decided
+CPROD_ROOT=/u/m20/cprod
+export AUTO_RESTART=false
+OPSTOPRUN=$CPROD_ROOT/opstoprun
+export UM_SECTOR_SIZE=2048
+
+# the following 4 could possibly be moved out 
+# if users never change these
+
+export OPSTARTDIR=$CPROD_ROOT/opstartinfo
+export OPSYSERR=$CPROD_ROOT/opsyserr
+export OPARCHERR=$CPROD_ROOT/oparcherr
+export CRERRDIR=$CPROD_ROOT/runerrmsg
+AC=p66
+
+# allows retries of getibm and similar facilities.
+export IBM_RETRY=5   
+
+# Comment the following to run with streams off.
+# May be required if system is not stream safe.
+export SCACHE_D_STREAMS=1
+
+### END of non-portable block  (UKMO ONLY)
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+fi
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### START of Users top script insert           
+
+if test -f /home/599/$USER/CABLE-AUX/UM/cable_start.ksh
+then
+. /home/599/$USER/CABLE-AUX/UM/cable_start.ksh
+else
+  echo "ERROR: User top script insert /home/599/$USER/CABLE-AUX/UM/cable_start.ksh not found"
+  exit 1
+fi
+### END of Users top script insert               
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+###################################################
+# CORE DUMP SAVING                                #
+###################################################
+
+export SAVECORE=true
+export COREDUMP=/tmp/$RUNID.core$$
+
+###################################################
+# User defined NEC Runtime variables              #
+###################################################
+
+
+###################################################
+# User defined environment variables              #
+###################################################
+
+export AUSCOM_CPL=FALSE
+
+###################################################
+# Standard directories for input files etc        #
+# ILP: table from subindep_FilDir                 #
+###################################################
+
+export DATAOUTPUT=/short/p66
+export ANCILDIR=/projects/access/data/ancil/HadGEM3_cal365
+export ACCESS_ANCIL=/projects/access/data/ancil/access_v2
+export CMIP5ANCIL=/projects/access/data/ancil/CMIP5
+export MY_ANCIL=/projects/access/data/ancil/CMIP5
+export SO2_ANCIL=/projects/access/data/ACCESS_UM_Input/vn7.3/HGPKG2-365
+
+###################################################
+# User defined output directories                 #
+###################################################
+
+UM_DATAW=/short/p66/$USER/$RUNID       # User-specific read/write data files
+UM_DATAM=/short/p66/$USER/$RUNID       # Output Dumps/PP/etc. Generated names
+export DATAW=$UM_DATAW
+export DATAM=$UM_DATAM   
+export UM_ROUTDIR=/short/p66/jxs599/UM_ROUTDIR/$USERID/$RUNID
+
+# Ensure the following directories exist (o/w run-only jobs will fail)
+for dir in $UM_DATAW $UM_DATAM
+do
+  if test ! -d $dir; then
+   echo "Creating directory $dir"
+   mkdir -p $dir
+  fi
+done
+
+
+
+###################################################
+# Directory pointers in environment variables     #
+###################################################
+
+# For files required only during the run
+export TEMP=${UM_TMPDIR:-${TMPDIR}}      
+
+# For executable files
+EXEC=$UMDIR/vn$VN/$TARGET_MC/exec        
+
+# Using full or incremental build
+SCRIPT=$DATAW/bin:$UM_ROUTDIR/bin:$UMDIR/vn$VN/$TARGET_MC/scripts
+
+PATH=$SCRIPT:$EXEC:$PATH
+echo "PATH used = $PATH"
+
+###################################################
+# Directories on TARGET_MC                        #
+###################################################
+
+# PROD_TARGET=$DATADIR
+# DATAW_TARGET=$PROD_TARGET/$RUNID
+# DATAM_TARGET=$PROD_TARGET/$RUNID
+# UCOMPDIR_TARGET=$PROD_TARGET/$RUNID/Compile
+# URECONDIR_TARGET=$PROD_TARGET/$RUNID/Recon
+
+# if test $PLATFORM = "TARGET"
+# then
+#  PROD=$PROD_TARGET
+#  DATAW=$DATAW_TARGET
+#  DATAM=$DATAM_TARGET
+#  UCOMPDIR=$UCOMPDIR_TARGET
+#  URECONDIR=$URECONDIR_TARGET
+# fi
+
+# Set false to always keep output from all PEs
+export UM_NAM_MAX_SECONDS=${UM_NAM_MAX_SECONDS:-300}
+UM_DEL_MPP_OUTPUT=false  
+
+# Indicates whether operational model
+export OPERATIONAL=false       
+
+# Switch for automatic output processing
+export AUTOMATIC_PP=false   
+
+# Output class for resubmitted jobs
+export OUT_CLASSR=leave    
+
+# Output class for start-run jobs   
+export OUT_CLASS=leave         
+
+###################################################
+# Variables relating to reconfiguration           #
+###################################################
+
+# Timer for reconfiguration       
+export RCF_TIMER=false 
+
+# Delete recon output on success
+RCF_DEL_MPP_OUTPUT=true 
+
+# Level of print output from reconfiguration
+export RCF_PRINTSTATUS=${RCF_PRINTSTATUS:-4}
+
+# Indicates if Atmos reconfiguration step
+export RCF_ATMOS=true 
+
+# Flag to delete old histfile in NRUN
+export PURGEHIST=true          
+
+# Indicates whether OUTPUT2 is printed
+LONGOUTPUT=false        
+
+# PrStatus_Min, PrStatus_Normal, PrStatus_Oper or PrStatus_Diag 
+export PRINT_STATUS=${PRINT_STATUS:-PrStatus_Normal} 
+
+# load module, UM model
+export LOADMODULE=/short/p66/$USER/UM_ROUTDIR/$USER/$RUNID/ummodel/bin/$RUNID.exe    
+
+
+# load module, reconfiguration
+export LOADRECON=/short/p66/$USER/$RUNID/bin/qxreconf  
+
+###################################################
+#  Model control files                            #
+###################################################
+
+# Switch for printing files
+PRINT_INPUT=true 
+
+# Root for system STASHmaster files
+export STASHMSTR=$UMDIR/vn$VN/ctldata/STASHmaster  
+
+# Root for system ANCILmaster files
+export ANCILMSTR=$UMDIR/vn$VN/ctldata/ANCILmaster  
+
+# Destination of standard output files
+export UM_STDOUT_FILE=$DATAW/$RUNID.fort6.pe  
+
+# Destination of recon atmos output files
+export RCF_STDOUT_FILE_A=$DATAW/$RUNID.fort6.rcfa.pe  
+
+# Output from pe0 for model
+UM_MPP_OUTPUT="$UM_STDOUT_FILE"0          
+
+# Output from pe0 for recon (atm)
+RCF_MPP_OUTPUT_A="$RCF_STDOUT_FILE_A"0         
+
+# Output file for the job step
+PREFIXT=""
+export OUTPUT=$DATAW/$PREFIXT$RUNID.out       
+
+# Running submodels
+export UM_ATMOS=true 
+
+# Set variables for NEMO / CICE standalone combinations
+
+export NEMO=false  
+export CICE=false  
+
+# Indicates automatic postprocessing
+UM_AUTOPP=false 
+
+# Indicates whether MPP run
+UM_PROCT=true 
+
+# Indicates a suite run
+UM_SUITE=false 
+
+UM_END_MAIL=true
+UM_LOUTPUT=500000
+
+
+
+
+###################################################
+# Finally call the revised top level script       #
+# for the UM                                      #
+###################################################
+
+. UMScr_TopLevel
+RC=$?
+
+###################################################
+# USERS bottom script insert       start          #
+###################################################
+if test -f /home/599/$USER/CABLE-AUX/UM/cable_end.ksh
+then
+. /home/599/$USER/CABLE-AUX/UM/cable_end.ksh
+else
+  echo "ERROR: User bottom script insert /home/599/$USER/CABLE-AUX/UM/cable_end.ksh not found"
+  exit 1
+fi
+###################################################
+# USERS bottom script insert       end            #
+###################################################
+
+exit $RC

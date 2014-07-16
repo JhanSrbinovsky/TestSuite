@@ -1,0 +1,395 @@
+#!/bin/ksh
+#---------------------------------------------------------------------
+# Name: SUBMIT
+# Purpose: Creates umuisubmit_compile, umuisubmit_run 
+#          and umuisubmit_clr on the remote platform. 
+#         
+# Created from UMUI vn7.3
+#---------------------------------------------------------------------  
+
+. /etc/profile
+
+# Temporary work-around for setting TMPDIR on cherax. MRD 2009-08-03
+if [ "$HOST" = "cherax" ]; then
+  TMPDIR=${TMPDIR:-/work/$USER}
+  echo "TMPDIR", $TMPDIR
+fi
+
+SUBMITID=191222944                   
+export SUBMITID                           
+RUNID=jaaad
+JOBDIR=$HOME/umui_runs/$RUNID-$SUBMITID
+export JOBDIR
+
+
+##################################################################
+#           Hand edit section                                    #
+##################################################################
+#   STEP=0  Build and Stop                                       #
+#   STEP=2  Build and Run                                        #
+#   STEP=4  Run Only                                             #
+#   STEP=99 Reconfiguration Only                                 #
+#   NRUN -  New run, CRUN - Continuation                         #
+##################################################################
+
+TYPE=NRUN 		
+STEP=2
+
+##########################################################
+# Queue details for NRUN                                 #
+##########################################################
+NRUN_TIME_LIMIT=180
+QUEUE_NRUN=express
+
+###################################################
+# Queue details for CRUN and resubmission runs    #
+###################################################
+
+QUEUE_CRUN=normal
+CRUN_TIME_LIMIT=86400
+
+RESUB_INC_DAYS=0
+RESUB_INC_MONTHS=12
+RESUB_INC_YEARS=0
+RUN_LEN_DAYS=0
+RUN_LEN_MONTHS=0
+RUN_LEN_YEARS=0
+
+###################################################
+# Other queue details                             #
+###################################################
+
+MEMORY=32000MB
+CJOBN=jaaad000
+
+###################################################
+# Account ID                                      #
+###################################################
+
+ACCOUNT=p66
+
+###################################################
+# Number of processors for model run              #
+###################################################
+
+# Processor decomposition for MPP.
+NMPPE=1           # E-W decomposition
+NMPPN=16           # N-S decomposition
+NEMO_NPROC=0
+
+###################################################
+# Options for the reconfiguration                 #
+###################################################
+
+# Processor decomposition 
+# Use the same as or fewer processors than for model
+RCF_NPROCY=1           # N-S decomposition
+RCF_NPROCX=1           # E-W decomposition
+
+########################################################
+# TARGET_MC is used in path to small execs and scripts #
+########################################################
+
+export TARGET_MC=normal
+RHOST_NAME=raijin.nci.org.au
+
+###################################################
+# Indicates if new recon. execut. required        #
+# (Previously in SCRIPT)                          #
+###################################################
+
+export RCF_NEW_EXEC=true   
+
+###################################################
+# Begin with compilation or run                   #
+################################################### 
+
+if [[ $RCF_NEW_EXEC = "true" ]]; then
+ PART=COMPILE
+elif [[ $STEP -eq 4 || $STEP -eq 99 ]]; then
+ PART=RUN
+else
+ PART=COMPILE
+fi
+
+####################################################################
+#           End of Hand edit section                               #
+####################################################################
+
+
+###################################################
+# Get date-time stamp for output files            #
+# and set output class                            #
+###################################################
+
+OUTPUT_D=`date +%y%j`
+OUTPUT_T=`date +%H%M%S`
+OCO=leave
+
+###################################################
+# This section creates separate scripts:          #
+# tmp_compile, tmp_run, tmp_clr and temporary     #
+# file umuisubmit_vars for common use             #
+###################################################
+
+export MY_OUTPUT=$HOME/um_output  # ACCESS
+
+COMP_OUT_PATH=$MY_OUTPUT
+TARGET_OUT_PATH=$MY_OUTPUT
+
+COMP_OUTFILE=$CJOBN.$RUNID.d$OUTPUT_D.t$OUTPUT_T.comp.$OCO
+RUN_OUTFILE=$CJOBN.$RUNID.d$OUTPUT_D.t$OUTPUT_T.$OCO
+
+RUN_COMPILE=false    
+RUN_MODEL=false
+
+  echo ""
+  echo "Your job directory on host $RHOST_NAME is:"
+  echo "  $JOBDIR"
+
+if [[ $RCF_NEW_EXEC = "true" || $STEP -eq 0 || $STEP -eq 2 ]]; then
+  RUN_COMPILE=true
+  OUTPUT_FILE=$COMP_OUT_PATH/$COMP_OUTFILE
+  echo "Your compilation output will be sent to file:"
+  echo "  $OUTPUT_FILE"
+  if [[ $TYPE = "CRUN" ]] ; then
+    echo "You have selected a compilation step and  a continuation run CRUN."
+    echo "This is not allowed. Please modify your UMUI settings."
+    echo "For quick fix set RCF_NEW_EXEC to false in SUBMIT file"
+    exit
+  fi
+fi
+
+if [[ $STEP -eq 2 || $STEP -eq 4 || $STEP -eq 99 ]]; then
+  RUN_MODEL=true
+  RUN_OUTPUT_FILE=$TARGET_OUT_PATH/$RUN_OUTFILE
+  echo "Your model output will be sent to file:"
+  echo "  $RUN_OUTPUT_FILE"
+fi
+
+###################################################
+# Export for use in script                        #
+###################################################
+
+# Calculate total PEs for use in QSUB option
+let UM_NPES=$NMPPE*$NMPPN
+
+# Number of processors requested
+((TOTAL_PE_REQ=$UM_NPES+$NEMO_NPROC))
+
+let RCF_NPES=$RCF_NPROCX*$RCF_NPROCY
+if test $RCF_NPES -gt $TOTAL_PE_REQ; then
+  if test $STEP -eq 99 -o "$TYPE" = "NRUN"; then
+    TOTAL_PE_REQ=$RCF_NPES
+  fi
+  if test "$TYPE" = "NRUN"; then
+    echo "WARNING: Reconfiguration uses more PEs than model. This may be inefficient"
+  fi
+fi
+
+
+
+# Common to all STEPs
+if test $TYPE = 'NRUN'; then
+  QUEUE=$QUEUE_NRUN
+else
+  QUEUE=$QUEUE_CRUN
+fi
+
+# Submit Files
+tmp_compile=$TMPDIR/umuisubmit_compile.$$
+tmp_run=$TMPDIR/umuisubmit_run.$$
+tmp_clr=$TMPDIR/umuisubmit_clr.$$
+
+
+
+
+###################################################
+# Create tmp_compile file                         #
+###################################################
+
+if test $RUN_COMPILE = "true" ; then
+NPROC=4
+COMPTLIM=3000
+# On the NCI machines use all the available memory per processor for building
+CMEMORY=8000MB
+  cat >>$tmp_compile<<EOF
+#!/bin/ksh
+#PBS -l walltime=$COMPTLIM
+#PBS -l mem=$CMEMORY
+# Need to make this match the number set for the build.
+#PBS -l ncpus=$NPROC
+#PBS -o $OUTPUT_FILE
+#PBS -j oe
+#PBS -l software=intel-fc/$NPROC:intel-cc/$NPROC
+#PBS -q $QUEUE
+#PBS -N jaaad.compile
+#PBS -mabe -Msrb001@csiro.au
+#PBS -P p66
+
+# Modules for Raijin
+module use ~access/modules
+module load intel-cc/12.1.9.293
+module load intel-fc/12.1.9.293
+module load openmpi/1.6.5
+module load fcm/2.3.1
+module load gcom/4.4
+module load dummygrib
+module load oasis3-mct
+module load um
+
+# Required for ACCESS runs
+module unload netcdf
+module load netcdf/4.2.1.1
+
+
+mkdir -p \$(dirname $OUTPUT_FILE)
+EOF
+
+  cat $JOBDIR/FCM_BLD_COMMAND >>$tmp_compile
+fi
+
+###################################################
+# Create tmp_run file                             #
+###################################################
+
+  if [[ $TYPE = "NRUN" ]]; then
+    TIME=$NRUN_TIME_LIMIT
+  else
+    TIME=$CRUN_TIME_LIMIT
+  fi
+
+
+  cat >>$tmp_run<<EOF
+#!/bin/ksh
+#PBS -l walltime=$NRUN_TIME_LIMIT
+#PBS -l mem=$MEMORY
+#PBS -l ncpus=$UM_NPES
+#PBS -l jobfs=2GB
+#PBS -q $QUEUE
+#PBS -o $RUN_OUTPUT_FILE
+#PBS -j oe
+#PBS -N jaaad.run
+#PBS -mabe -Msrb001@csiro.au
+#PBS -P p66
+
+# Single proc N48 requires this? much
+# ulimit -s 512000
+# N96 requires ? (depends on segments)
+ulimit -s unlimited
+
+# Modules for Raijin
+module use ~access/modules
+module load openmpi/1.6.5
+module load um
+
+
+mkdir -p \$(dirname $RUN_OUTPUT_FILE)
+EOF
+
+  if test $STEP -eq 2 ; then
+    echo "export STEP=4" >>$tmp_run
+  else
+    echo "export STEP=$STEP" >>$tmp_run
+  fi
+
+
+################################################### 
+# Set up common variables used in NRUNs and CRUNs #
+###################################################
+
+cat >>$TMPDIR/umuisubmit_vars.$$<<EOF
+
+# Choose shell "set" options for  lower level scripts
+export SETOPT=""          
+export TYPE=$TYPE
+
+# Run/Resubmit interval parameters
+export AUTO_RESUB=Y
+export RESUB_INC_DAYS=$RESUB_INC_DAYS
+export RESUB_INC_MONTHS=$RESUB_INC_MONTHS
+export RESUB_INC_YEARS=$RESUB_INC_YEARS 
+export RUN_LEN_DAYS=$RUN_LEN_DAYS
+export RUN_LEN_MONTHS=$RUN_LEN_MONTHS
+export RUN_LEN_YEARS=$RUN_LEN_YEARS
+
+
+# Output file for run following compilation run.
+export UMRUN_OUTPUT=$RUN_OUTPUT_FILE
+export CJOBN=$CJOBN
+export CRDOERUN=$CRDOERUN
+export CRPRODRUN=$CRPRODRUN
+export MY_OUTPUT=$MY_OUTPUT
+export TARGET_MC=$TARGET_MC
+export RCF_DONE=\${RCF_DONE:-false}
+export JOBDIR=$JOBDIR
+export SUBMITID=$SUBMITID
+QUEUE=$QUEUE
+
+# MPP time limits
+export RUN_TIME_LIMIT=$RUN_TIME_LIMIT
+export QSUB_TIME="$QSUB_TIME"
+export NPROC=4
+
+export UM_NPES=$UM_NPES
+export NCPUS=UNSET
+export UM_ATM_NPROCX=$NMPPE
+export UM_ATM_NPROCY=$NMPPN
+export RCF_NPES=$RCF_NPES
+export RCF_NPROCY=$RCF_NPROCY
+export RCF_NPROCX=$RCF_NPROCX
+export LABEL=$LABEL
+export RUN_TYPE=normal
+EOF
+
+###################################################
+# Copy the above variables into run script        #
+# and add the script                              #
+###################################################
+
+  cat $TMPDIR/umuisubmit_vars.$$ >> $tmp_run
+  cat $JOBDIR/SCRIPT >>$tmp_run
+
+###################################################
+# Create umuisubmit_clr file and run on NEC using #
+# qsub or on a local machine                      #
+###################################################
+
+if test $RUN_COMPILE = "true" -a $RUN_MODEL = "true"; then
+  cat $tmp_compile >> $tmp_clr
+
+    echo " if (( \$RC == 0 )); then" >>$tmp_clr
+    echo "    qsub -S /bin/ksh $JOBDIR/umuisubmit_run" >>$tmp_clr
+    echo " fi" >>$tmp_clr
+ 
+  mv $tmp_clr $JOBDIR/umuisubmit_clr
+  chmod 755 $JOBDIR/umuisubmit_clr
+fi
+
+###################################################
+# Move umuisubmit files to job library for use by #
+# fcm_main, startruns and resubmitted runs        #
+###################################################
+
+if test $RUN_COMPILE = "true" ; then
+  mv $tmp_compile $JOBDIR/umuisubmit_compile
+  chmod 755 $JOBDIR/umuisubmit_compile
+fi
+
+if test $RUN_MODEL = "true" ; then
+  mv $tmp_run $JOBDIR/umuisubmit_run
+  chmod 755 $JOBDIR/umuisubmit_run
+fi
+
+rm $TMPDIR/umuisubmit_vars.$$
+if [[ -f $tmp_run ]] ; then
+  rm $tmp_run
+fi
+if [[ -f $tmp_compile ]] ; then
+  rm $tmp_compile
+fi
+if [[ -f $tmp_clr ]] ; then
+  rm $tmp_clr
+fi
+
+# END OF FILE

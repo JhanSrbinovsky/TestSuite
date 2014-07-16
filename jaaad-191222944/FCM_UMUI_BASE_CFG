@@ -1,0 +1,77 @@
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# File name: FCM_UMUI_BASE_CFG
+# Header:    Version number and user's logon
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 
+version::UM::base    HEAD
+rdest::remote_shell  ssh
+rdest::logname       jxs599
+ 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Part 1: Inherit from a Precompiled Build
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# 
+# If UMUI switch "Use a precompiled build" is selected then the
+# "use" declaration and full path to the file ext.cfg has to be
+# included. For example:
+#   use 	    $UM_PREBUILD/N48_atmos/umbase/cfg/ext.cfg 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Part 2: Script build declarations (MANDATORY)
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 
+bld::excl_dep::UM::script  EXE
+bld::excl_dep              USE::NetCDF
+bld::excl_dep              INC::netcdf.inc
+bld::excl_dep              INC::mpif.h
+bld::excl_dep              USE::mpl
+bld::excl_dep              USE::mod_prism_proto
+bld::excl_dep              USE::mod_prism_grids_writing
+bld::excl_dep              USE::mod_prism_def_partition_proto
+bld::excl_dep              USE::mod_prism_put_proto
+bld::excl_dep              USE::mod_prism_get_proto
+ 
+# Include script build targets 
+inc $UM_SVN_URL/src/configs/script_build/script_targets.cfg@HEAD
+ 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Part 4: User overrides from a branch (OPTIONAL)
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# 
+# If the user selects "Include modifications from branch(es)"
+# then a pair of "branchN" declarations for each branch needs
+# to be included.
+# For example:
+#   repos::UM::branch1    svn://fcm2/UM_svn/UM/branches/dev/hadbc/script_tests2/src
+#   expsrc::UM::branch1   /
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 
+ 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Part 5: Overrides from central script mods (OPTIONAL)
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# 
+# If the option "Use central script mods" in the umui is selected
+# then "script_mods" declaration needs to be included. Really it
+# is just another branch but with a predefined name.
+# For example: 
+#   repos::UM::script_mods     svn://fcm2/UM_svn/UM/branches/dev/?????
+#   expsrc::UM::script_mods    /
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Part 6: User overrides from a working copy (OPTIONAL)
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# 
+# If the option "Include modifications from user working copy"
+# is selected then "user" declarations needs to be included.
+# For example:
+#   repos::UM::user    /home/hc1100/hadbc/fcm_6.2/script_tests2/src
+#   expsrc::UM::user
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 
+repos::UM::user		    /flush/srb001/LAI_Ma/ACCESS_CABLE-2.0_iday/src
+expsrc::UM::user

@@ -1,0 +1,166 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script: archfail
+#
+#  Purpose : Copy requests in pipe to a failure file when an error
+#            in the server.
+#
+#  Current Owner: W Roseblade    Date: 1/02/06
+#  Reviewer: M Saunby            Date: 1/02/06
+#
+#  Tested under OS version: UNICOS unknown
+#  UM   version no: 3.4  Date of test: unknown
+#
+#  History:
+#  Model
+#  version  Date         Modification history:
+#  3.4      7/12/94      Original Version
+#  4.0      3/10/95      Only echo to failure file if
+#                        F_END_TF_COPY='off' L Wiles
+#  4.1      26/03/96     L Wiles
+#                        Correct if test on first line and change
+#                        wait to sleep. Correct RC test to be
+#                        consistent with qsserver script. Remove
+#                        empty trigger files if failure was
+#                        transferring first data file of a trigger
+#                        file. Delete trigger files if ARCHTAPE
+#                        false. L Wiles
+#  4.1      09/04/96     Remove *IF DEF METOCRAY and *ENDIFL C Wiles
+#  4.4      18-08-97     Add test for stoprunL C Wiles
+#  4.5      17/08/98     Optimisation change I Edmond
+#  5.1      10/07/00     Variable Classification W Roseblade
+#  5.2      11/08/00     Replace awk with UM_AWK. (R.Hatcher)
+#  5.2      30/08/00     New Header Format W Roseblade
+#  6.0      24/09/03     Remove CRACER/UABRF code W Roseblade.
+#  6.1      22/06/04     Use TMPDIR througout UM Scripts
+#                        Anthony A. Dickinson
+#  6.0      24/02/04     F_END_TF_COPY now "off" fixes restart
+#                        archive omission error W Roseblade.
+#  6.2      25/08/06     Remove space between #! /bin/ksh W Roseblade.
+#
+#  Programming Standard: UMDP 3, version 7.2
+#
+#  External documentation: UMDP Y1  Unified Model Automated Output
+#                                   Processing System
+#
+#   Interface and arguments:
+#
+#   archfail <none>
+#
+# ---------------------------------------------------------------------
+#   Called by: qsserver, qscasedisp,copy2dest
+#              (all same shell)
+#   Calls : none
+#
+#   Imports:
+#     RUNID               - Experiment/job ie abcde
+#     TMPDIR                - Temp Directory
+#     LOCKFILE            - Existence of this indicates whether model
+#                           still executing
+#     CURRENT_RQST_NAME   - Data file to be archived
+#     CURRENT_RQST_TYPE   - Request type of archiving
+#     CURRENT_RQST_ACTION - Request current action(archive/delete)
+#     PERCENT             - Sequence of characters used to identify
+#                           request is valid
+#     JOBID               - jobid letter
+#     PPCNTL_ERR          - Error in one of ppcntl variable settings
+#     ERRFLAG             - File to stop model run
+#     FAILPROC            - File to hold request info. if run fails
+#
+#   Exports:  none
+#
+#   Local variables:
+#     RC                  - Counter of number of reads done
+#     ERRMESS             - Error message
+
+#
+# End of header ------------------------------------------------------
+
+F_END_TF_COPY='off'
+
+if [[ $PPCNTL_ERR = false ]]
+then
+  # archfail has been called after qsserver started processing
+  # model reqests, so action needs to be taken
+
+#L----------------------------------------------------------------------
+#L Step 1:Write current request to FAILPROC
+#L----------------------------------------------------------------------
+
+   echo "$PERCENT $CURRENT_RQST_NAME $CURRENT_RQST_ACTION\
+ $CURRENT_RQST_TYPE $DATA_TYPE" >> $FAILPROC
+fi
+
+#L----------------------------------------------------------------------
+#L Step 2:Write a message to the ERRFLAG file to stop the model run
+#L        or write message to output file if run stopped by operator.
+#L----------------------------------------------------------------------
+
+if [[ -s $TMPDIR/$RUNID.stopped ]]
+then
+  banner OP STOPRUN
+  echo  "This run has been stopped by the operator "
+  echo  "A .failure file is being produced."
+  echo  "Archiving will be tidied up when the job is"
+  echo  "re-submitted"
+  echo 'ERRFLAG contents =' `cat $ERRFLAG`
+else
+  ERRMESS="T   qsserver failure at `date` "
+  banner ERRFLAG
+  echo $ERRMESS
+  echo $ERRMESS > $ERRFLAG
+fi
+#L----------------------------------------------------------------------
+#L Step 3:Save any remaining requests in the input pipe
+#L----------------------------------------------------------------------
+
+RC=0
+while (( $RC == 0 ))
+do
+  read PERCENT CURRENT_RQST_NAME CURRENT_RQST_ACTION \
+  CURRENT_RQST_TYPE DATA_TYPE
+  RC=$?
+
+  # Check for end of data and call script to close down process
+
+  if (( $RC != 0 ))
+  then
+
+    if [[ -f $LOCKFILE ]]   # LOCKFILE indicates model still executing
+    then
+      echo "qsserver: EOF on PIPE but model still executing - waiting"
+      sleep 30
+      PERCENT="xxx"
+      RC=0
+    else                 # No LOCKFILE so genuine EOF - Wrap up server
+      PERCENT="xxx"
+      echo "$PERCENT" >> $FAILPROC
+      break
+    fi
+  fi
+
+# Echo request into FAILPROC
+
+  echo "$PERCENT $CURRENT_RQST_NAME $CURRENT_RQST_ACTION \
+$CURRENT_RQST_TYPE $DATA_TYPE" >> $FAILPROC
+done
+
+#L----------------------------------------------------------------------
+#L Step 5: Mail user with Fatal archive message if MAIL set to M(mail)
+#L----------------------------------------------------------------------
+
+if [[ $MAIL = "M" ]]
+then
+  if [ $# -eq 1 ]
+  then
+    MAILMSG=$1
+    mailx -s "ARCHIVE ERROR" $MAIL_ID < $MAILMSG
+    rm $MAILMSG
+  fi
+fi
+

@@ -1,0 +1,179 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+# WARNING this has only been tested on the CRAY (24/11/94)
+#
+#  Script:  mergeum
+#
+#  Purpose: Merges two atmosphere, ocean, ancillary or boundary files.
+#           Arguments: $4 or $6 arguments as follows:-
+#
+#            $1           -t/Integer     Number of fields from file 1
+#                                        or point of overlap for
+#                                        timeseries with -t option
+#            $2           File 1         1st input file name
+#            $3           File 2         2nd input file name
+#            $4           File 3         output file name
+#            $5           -uSTASH        User STASHmaster supplied
+#            $6           USTSNUM        User STASHmaster file name
+#
+# WARNING this has only been tested on the CRAY (24/11/94)
+#
+#  Current Owner: W Roseblade    Date: 1/02/06
+#  Reviewer: M Saunby            Date: 1/02/06
+#
+#
+#  Programming standard: UMDP 3, version unknown
+#
+#  External documentation:
+#    <UMDP number & name of external documentation>
+#
+#  Interface and arguments:
+#
+#           Arguments: $4 or $6 arguments as follows:-
+#
+#            $1           -t/Integer     Number of fields from file 1
+#                                        or point of overlap for
+#                                        timeseries with -t option
+#            $2           File 1         1st input file name
+#            $3           File 2         2nd input file name
+#            $4           File 3         output file name
+#            $5           -uSTASH        User STASHmaster supplied
+#            $6           USTSNUM        User STASHmaster file name
+#   -------------------------------------------------------------------
+#
+#   Called by: user
+#   Calls    : none
+#
+#   Imports  :
+#     PRINT_STATUS
+#     TMPDIR
+#     UMDIR
+#
+#
+#   Exports  :
+#     FILENV
+#     FILE1
+#     FILE2
+#     FILE3
+#     UNIT22
+#
+#   Local variables:
+#     EXEC         -
+#     STASHmaster  - Stashmaster file
+#     USTASH       - User STASHmaster file flag
+#     USTSNUM      - User STASHmaster file name
+#     VN           - UM Version
+#     counter      -
+#     len          -
+#
+#   End of header -----------------------------------------------------
+#
+#
+# Step 0 - Check call syntax
+#
+if [ $# -ne 4 -a $# -ne 6 ]
+  then echo \
+"$0: Usage is $0 -t/integer file1 file2 file3 -uSTASH stnamlst"
+  exit 1
+fi
+#
+########################################################################
+# Step 1 - Initialise environment variables
+#
+PLATFORM=@platform@
+PRINT_STATUS=${PRINT_STATUS:-PrStatus_Oper}
+FILENV=$TMPDIR/fileno.$$
+USTASH=n
+TMPDIR=$SCRATCH
+USTSNUM=$TMPDIR/namlst.$$
+echo " &USTSNUM">$USTSNUM
+echo " N_USTASH = 0 , NRECS_USTASH = 0 ,">>$USTSNUM
+echo " USTSFILS= ''">>$USTSNUM
+echo " /">>$USTSNUM
+export FILENV FILE1 FILE2 FILE3 UNIT22
+counter=0
+########################################################################
+# Step 2 - Interpret arguments
+#
+# 1st argument
+#
+if [ "$1" = "-t" ]
+  then echo " &CONTROL NRECF1 = -1 /">$TMPDIR/nlist.$$
+elif [ $1 -ge 0 ]
+ then len=`echo $1|wc -c`
+  if   [ len.eq.1 -a "$1"=\[0-9\] ]
+    then echo " &CONTROL NRECF1 = $1 /">$TMPDIR/nlist.$$
+  elif   [ len.eq.2 -a "$1"=\[0-9\]\[0-9\] ]
+    then echo " &CONTROL NRECF1 = $1 /">$TMPDIR/nlist.$$
+  elif   [ len.eq.3 -a "$1"=\[0-9\]\[0-9\]\[0-9\] ]
+    then echo " &CONTROL NRECF1 = $1 /">$TMPDIR/nlist.$$
+  elif   [ len.eq.4 -a "$1"=\[0-9\]\[0-9\]\[0-9\]\[0-9\] ]
+    then echo " &CONTROL NRECF1 = $1 /">$TMPDIR/nlist.$$
+  else
+    echo "ERROR: Length $1 not supported"
+    exit 1
+  fi
+else
+  echo "ERROR: Length $1 not supported"
+  exit 1
+fi
+#
+# 2nd argument
+#
+FILE1=$2
+if     [ -f "$FILE1"  ]                   # Check if file 1 exists
+      then counter=1
+else
+      echo "$FILE1 does not exist"
+      exit 1
+fi
+#
+# 3rd argument
+#
+FILE2=$3
+if     [ -f "$FILE2"  ]                   # Check if file 2 exists
+      then counter=2
+else
+      echo "$FILE2 does not exist"
+      exit 2
+fi
+#
+# 4th argument
+#
+FILE3=$4
+if [ "$5" = "-uSTASH" ]
+  then USTSNUM=$6
+fi
+########################################################################
+# Step 3 - Assign files
+
+
+# VN here is automatically set in this script at each UM build
+VN=@vn@
+
+TARGET_MC=@target_mc@
+STASHMSTR=$UMDIR/vn$VN/ctldata/STASHmaster
+EXEC=${EXEC:-$UMDIR/vn$VN/$TARGET_MC/exec}
+UNIT22=$STASHMSTR
+#
+########################################################################
+# Step 4 - Execute utility & print out data
+#
+cat $TMPDIR/nlist.$$ >> $USTSNUM
+$EXEC/qxmerge <$USTSNUM > $TMPDIR/merge.out.$$
+CC=$?
+if [ $CC != 0 ]
+then
+echo 'Problem with MERGEUM program'
+fi
+#
+cat $TMPDIR/merge.out.$$
+#
+########################################################################
+# Step 5 - Delete temporary files and exit
+rm $TMPDIR/fileno.$$ $TMPDIR/namlst.$$ $TMPDIR/merge.out.$$
+exit $CC

@@ -1,0 +1,94 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script:  getfile
+#
+#  Purpose: Retrieve file from Users experiment library and copy
+#           to location expected by Unified Model script.
+#
+#           This script is portable.
+#           The script needs to be executed in the environment of
+#           the calling script to force the job to stop if the
+#           get fails.
+#
+#  Current Owner: W Roseblade    Date: 1/02/06
+#  Reviewer: M Saunby            Date: 1/02/06
+#
+#  Tested under OS version: UNICOS 6.1.5A (Cray c90)
+#                           HP-UX A.08.07 (HP workstation)
+#
+#  UM version no: 3.1         Date: 17 March 1993
+#
+#   History:
+#    Model
+#  version  Date         Modification history:
+#    ?      7/09/92      Altered Cray directory assumed for Cray only
+#                        option.
+#    ?      17/03/93     Filenames checks for padding changed to upper
+#                        case as UI script changed.
+#    ?      11/01/94     Included test for successful file retrieval.
+#                        C. Perks
+#    ?      20/12/94     Removed CRAYONLY option (use CRAY).K Rogers
+#    ?      04/04/95     Change for use with new UMUI. M. Carter
+#    ?      03/10/95     Changed mv to cp for control files. K Rogers
+#    5.2    14/09/00     New Header Format W Roseblade
+#  6.2      25/08/06     Remove space between #! /bin/ksh W Roseblade.
+#
+#  Programming standard: UM Doc Paper 3A, version 1 (29/10/90)
+#
+#  External documentation: UMDP C0
+#
+#   Interface and arguments:
+#
+#     $1 - filename in run directory.
+#     $2 - Location of  run directory.
+#     $3 - Output file
+#     $4 - Logical, is a print required in the output.
+#
+#
+#   -------------------------------------------------------------------
+#
+#   Called by: User Interface script
+#
+#   Imports:
+#     EXPTID        - experiment identifier
+#     OUTPUT        - the output file
+#
+#   Exports: none
+#
+#   Local:
+#     RC_G          - error return code
+#
+#
+# End of header -------------------------------------------------------
+#
+# Correct number of arguments ?
+if test $# -ne 4
+then
+  echo 'Usage is: . getfile <file> <location> <destination> <print> '
+  exit
+fi
+#
+# Move the file.
+cp $2/$1 $3
+RC_G=$?
+# Did it work.
+if test $RC_G -ne 0
+then
+  echo 'Getfile failed. Return code ' $RC_G
+  echo 'Trying to get ' $2/$1
+  echo 'Stopping '
+  exit
+fi
+#
+# Print the file is required.
+if $4
+then
+  banner $1 >> $OUTPUT
+  cat $3 >> $OUTPUT
+fi
+#L----------------------------------------------------------------------

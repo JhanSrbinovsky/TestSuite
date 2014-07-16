@@ -1,0 +1,82 @@
+#!/usr/bin/ksh
+#---------------------------------------------------------------------
+# Script: fcm_main
+#---------------------------------------------------------------------
+#
+# Purpose: Calls fcm extract on a local machine and fcm build
+#          and/or run commands on a remote machine
+#
+# Created from umui vn7.3
+#---------------------------------------------------------------------
+
+
+#---------------------------------------------------------------------
+#   Exported variables
+#---------------------------------------------------------------------
+
+export RUNID=jaaad
+export RUN_ON=raijin.nci.org.au
+export USERID=jxs599
+export UM_RDATADIR=/short/p66/$USER/$RUNID
+
+export UM_SVN_URL=fcm:um_br/dev/Share/VN7.3_local_changes
+export UM_SVN_BIND=$UM_SVN_URL/src/configs/bindings
+export UM_CONTAINER=$UM_SVN_BIND/container.cfg
+
+#---------------------------------------------------------------------
+# For this job follow actions will be performed:
+#   DO_CLR=0  Do nothing
+#   DO_CLR=1  Build Only
+#   DO_CLR=2  Run Only
+#   DO_CLR=3  Build and Run
+#---------------------------------------------------------------------
+
+DO_EXTR=true
+DO_CLR=3
+export RC=0
+
+#---------------------------------------------------------------------
+#   Extract commands
+#---------------------------------------------------------------------
+
+if test $DO_EXTR = "true" -a  $RC -eq 0 ; then
+   echo
+   echo FCM_MAIN: Calling Extract ...
+/home/cmar/srb001/umui_jobs/jaaad/FCM_EXTR_SCR
+   RC=$?
+   if test $RC -eq 0 ; then
+     echo FCM_MAIN: Extract OK
+   else
+     echo FCM_MAIN: Extract failed >&2
+     echo Tidying up directories ...
+     ssh -q ${RUN_ON} -l ${USERID} -n "rm -rf ~/umui_runs/$RUNID-$1"
+     echo FCM_MAIN stopped with return code $RC
+     exit
+   fi
+ fi
+
+#---------------------------------------------------------------------
+#   Generated remote script
+#---------------------------------------------------------------------
+
+RUN_FILE=umuisubmit_clr
+
+#---------------------------------------------------------------------
+#   Submit to compile or/and run
+#---------------------------------------------------------------------
+
+ if test $RC -eq 0 ; then
+   echo
+   echo FCM_MAIN: Submitting $RUN_FILE ...
+    ssh raijin.nci.org.au -l jxs599 -n qsub -S /bin/ksh umui_runs/jaaad-$1/$RUN_FILE
+   RC=$?
+   if test $RC -eq 0 ; then
+     echo FCM_MAIN: Submit OK
+   else
+     echo FCM_MAIN: Submit failed >&2
+   fi
+ fi
+ 
+exit 0
+
+#EOF

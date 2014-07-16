@@ -1,0 +1,426 @@
+#!/bin/ksh
+# *****************************COPYRIGHT*******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT*******************************
+#
+#  Script:  UMScr_TopLevel
+#
+#  Purpose: Top level script controlling model runs
+#
+#  Programming standard: UMDP 3, version 7.2
+#
+#  External documentation: none
+#
+#  Interface and arguments:-     UMScr_TopLevel none
+#
+#  -------------------------------------------------------------------
+#
+#  Called by: UMUI generated scripts umuisubmit_run / umuisubmit_clr
+#  Calls:     qsmaster
+#             submitchk
+#
+# End of header -------------------------------------------------------
+
+set -$SETOPT
+
+UM_START_MAIL=${UM_START_MAIL:-false}
+
+if $UM_START_MAIL; then
+  MESSAGE="Run ${EXPTID}${JOBID} started. Time=`date`"
+  echo "$MESSAGE" | mailx -s "$MESSAGE" $UM_MAIL_ID
+fi
+
+echo "*****************************************************************"
+echo "     Job started at : `date`"
+
+if test -z "$OPRESTART"; then
+    echo "     Run started from UMUI"
+elif test "$OPRESTART" -eq 0; then
+    echo "     Run restarted by user startrun after a stoprun"
+elif test "$OPRESTART" -eq 1; then
+    echo "     Run restarted by operator startrun after a stoprun"
+elif test "$OPRESTART" -eq 2; then
+    echo "     Run restarted by operator after a system crash/failure"
+elif test "$OPRESTART" -eq 3; then
+    echo "     Run resubmitted automatically from previous run"
+elif test "$OPRESTART" -eq 4; then
+    echo "     Run resubmitted by operator after an archive error"
+elif test "$OPRESTART" -eq 5; then
+    echo "     Run resubmitted by operator after a system error"
+else
+    echo "     Run resubmitted with unknown restart code $OPRESTART"
+fi
+
+echo "     Running from control files in $JOBDIR"
+if test $UMMACHINE = "NECTX7" || test $UMMACHINE = "NECSX6" ; then
+  if [ "$ES" != "true" ]; then
+  
+    # Run script to set up CR specific directory paths
+    . cr_env
+    
+  fi
+fi
+# Stop the run if there is already a restartable job running.
+
+
+if [[ -n "$AUTO_RESTART"  && -z "$UM_SUITE" ]] ; then
+  if test -e $OPSTARTDIR/"$RUNID"*; then
+     echo ---------------------------------------------------------
+     echo
+     echo "ERROR: A restart file exists for runid $RUNID in"
+     echo "$OPSTARTDIR"
+     echo "Either this runid is already running on this system or"
+     echo " any files (left by a sudden run failure) for this runid"
+     echo " need to be deleted from $OPSTARTDIR before rerunning."
+     echo
+     echo ---------------------------------------------------------
+     return 1
+  fi
+fi
+
+####   Machine and directory information                        ####
+echo "$JOB_LINE"
+echo "This job is running on machine `uname -n`,"
+
+# $UMDIR is set in top level environment
+
+echo "using UM directory $UMDIR,"  
+
+######   Set up directory pointers in environment variables    #####
+
+IN=$TMPDIR                    # Formatted input control files
+export STASETS_DIR=$UMDIR/vn$VN/ctldata/stasets  # stash sets file
+
+
+ERRFLAG=$TMPDIR/$RUNID.errflag
+export ERRFLAG=$TMPDIR/$RUNID.errflag
+
+
+### Set up prefixes for control files ### 
+
+  PREFIXX="${PREFIXX:-}"
+  PREFIXI="${PREFIXI:-}"
+  PREFIXR="${PREFIXR:-}"
+  PREFIXW="${PREFIXW:-}"
+
+### Output processing history file ###
+
+export PPHIST=$DATAM/$PREFIXW$RUNID.pphist # Front-end control file
+
+
+###  Model control files              ###
+
+PRINT_INPUT=${PRINT_INPUT:-true}       # Switch for printing files.
+SIZES=$IN/$PREFIXI$RUNID.sizes         # Sizes for dynamic allocation
+CNTLGEN=$IN/$PREFIXI$RUNID.cntlgen     # Control dimensioned by
+                                       # sub-model
+CNTLATM=$IN/$PREFIXI$RUNID.cntlatm     # Atmos control
+export CNTLALL=$IN/$PREFIXI$RUNID.cntlall     # All model control
+export NAMELIST=$IN/$PREFIXI$RUNID.namelists  # All the above namelists
+                                              # control
+					      
+export INITHIS=$IN/$PREFIXI$RUNID.inithis     # History initialisation
+export PPCNTL=$IN/$PREFIXW$RUNID.ppcntl       # Front-end control file
+export CONTCNTL=$IN/$PREFIXI$RUNID.contcntl   # control of continuation
+                                              # runs
+export PHIST=$DATAW/$PREFIXW$RUNID.phist      # Permanent history file
+export THIST=$DATAW/$PREFIXW$RUNID.thist      # Temporary history file
+export RECONCTLA=$IN/$PREFIXI$RUNID.recona    # Reconfiguration control
+                                              # file, atmos.
+if $OPERATIONAL; then
+  export HKFILE=$DATAW/$PREFIXW$opid.hkfile
+else
+  export HKFILE=$TMPDIR/$PREFIXT$RUNID.hkfile
+fi
+
+
+export STASHCTL=$IN/$PREFIXI$RUNID.stashc     # Diagnostic control file
+                                              # (STASH)
+export PPXREFU=$IN/$PREFIXI$RUNID             # Root for users
+                                              # STASHmaster files.
+export USTSHMSTR=$PPXREFU                     # User STASHmaster (Recon)
+export UANCLMSTR=$IN                          # Directory for User
+                                              # ANCILmaster files
+export HISTNLIST=$IN/$PREFIXI$RUNID.hnlist    # NAMELIST input for
+                                              # histprint
+export FAILPROC=$DATAM/$RUNID.failure         # failed server requests
+export JOBSCRIPT=$TMPDIR/$RUNID.job          # Job to level script
+export OUTPUT2=$DATAW/$PREFIXT$RUNID.out2    # Additional printed output
+export RESUB_FILE=$TMPDIR/$RUNID.resub       # File holding job for
+                                              # resubmit
+					      
+					      
+
+######   Set up histprint NAMELIST input                          ######
+cat >$HISTNLIST <<EOF
+ &PRINTOPT
+ LONG=F,
+ LAST_RECORD=F
+ /
+EOF
+
+if [[ "$UM_ATMOS" = "true" ]]; then
+
+  if test -r $JOBDIR/umuisubmit; then
+   # Not all systems use SUBMIT
+    banner UMSUBMIT >> $OUTPUT
+    echo "Copy of script submitted to the queue" >> $OUTPUT
+    cat $0 >> $OUTPUT
+  fi
+  if test $STEP -ge 1; then
+
+    . getfile SIZES $JOBDIR $SIZES $PRINT_INPUT
+    . getfile CNTLALL $JOBDIR $CNTLALL $PRINT_INPUT
+    . getfile CNTLGEN $JOBDIR $CNTLGEN $PRINT_INPUT
+    . getfile CNTLATM $JOBDIR $CNTLATM $PRINT_INPUT
+    . getfile PRESM_A $JOBDIR $PPXREFU.PRESM_A $PRINT_INPUT
+    . getfile UAFLDS_A $JOBDIR $UANCLMSTR/UAFLDS_A $PRINT_INPUT
+    . getfile UAFILES_A $JOBDIR $UANCLMSTR/UAFILES_A $PRINT_INPUT
+
+    cat $SIZES $CNTLALL $CNTLGEN $CNTLATM > $NAMELIST
+
+    . getfile INITHIS $JOBDIR $INITHIS $PRINT_INPUT
+    . getfile STASHC  $JOBDIR $STASHCTL $PRINT_INPUT
+    . getfile SCRIPT  $JOBDIR $JOBSCRIPT $PRINT_INPUT
+
+    if $RCF_ATMOS; then
+      . getfile RECONA $JOBDIR $RECONCTLA $PRINT_INPUT
+    fi
+    if test $TYPE = 'CRUN'; then
+      . getfile CONTCNTL $JOBDIR $CONTCNTL $PRINT_INPUT
+    fi      #     for if test $TYPE = 'CRUN'
+
+  fi  #  for if test $STEP -ge 1
+  
+  if $UM_AUTOPP; then
+  . getfile PPCNTL $JOBDIR $PPCNTL $PRINT_INPUT
+  fi
+
+
+fi # if test for UM Atmos
+
+
+
+# Remove old um fort files - this stops previous output appearing
+# in the output file and confusing users.
+
+if test -f $DATAW/$RUNID.fort* ; then
+  rm $DATAW/$RUNID.fort*
+fi
+
+# Remove old rcf fort files
+
+# Firstly check if the variable is set before
+# using it to delete anything
+
+if test ! -z "$RCF_STDOUT_FILE_A"; then
+
+ # Then check if there any files to delete before deleting
+
+  for RCF_FILE in "$RCF_STDOUT_FILE_A"*
+  do 
+    if test -f "$RCF_FILE" ; then
+      rm "$RCF_FILE"
+    fi
+  done
+  
+fi
+
+
+########################################################################
+######                                                            ######
+######      Run the model - Printed output goes to $DATAW         ######
+######                      before being deleted, normally        ######
+######                                                            ######
+########################################################################
+
+export SERVEROUT=$TMPDIR/$RUNID.servout    # Output from server process
+AUTOPPOUT=$TMPDIR/$RUNID.autoppout  # Output from auto-tidyup.
+
+# Map new to old naming conventions if low level scripts not changed
+
+
+if test $AUTOMATIC_PP = "true" -a $OPERATIONAL = "false"; then
+   . autopp_tidyup > $AUTOPPOUT
+   if test $AUTOPPCODE -eq 0  -a  $RCSERVER = 'F'; then
+     qsmaster $RUNID
+     RCMASTER=$?
+   fi
+else
+   qsmaster $RUNID                # Run the UM master script.
+   RCMASTER=$?                    # return code.
+fi
+
+echo ' <<<< Information about How Many Lines of Output follow >>>>'
+echo ' '`wc -l $OUTPUT | cut -f1 -d'/'`' lines in main OUTPUT file.'
+
+if  test $UM_PROCT = true; then
+  if test -a $UM_MPP_OUTPUT; then
+    let UM_PE0="$(wc -l < $UM_MPP_OUTPUT)"
+  else
+    UM_PE0=$((0))
+  fi
+
+  if test -a $RCF_MPP_OUTPUT_A; then
+    let RCFA_PE0="$(wc -l < $RCF_MPP_OUTPUT_A)"
+  else
+    RCFA_PE0=$((0))
+  fi
+
+  echo ' '$(($UM_PE0 + $RCFA_PE0))' lines of O/P from pe0.'
+  
+fi
+
+if [[ -n $LONGOUTPUT && -a $OUTPUT2 ]]; then
+    echo ' '`wc -l $OUTPUT2 | cut -f1 -d'/'`' lines in long OUTPUT \
+         file.'
+fi
+if [[ -n $AUTOMATIC_PP && -a $SERVEROUT ]]; then
+    echo ' '`wc -l $SERVEROUT | cut -f1 -d'/'`' lines in SERVER file.'
+fi
+echo ' <<<<         Lines of Output Information ends          >>>>'
+
+if test $UMMACHINE = "NECTX7" || \
+   test $UMMACHINE = "NECSX6" ; then
+   TRUNC="conv=notrunc"    # Stops the NEC overwiting existing output
+else                       # other platforms seem to do this by default
+   TRUNC=""                # If not on NEC then set to ""
+fi
+banner " OUTPUT "
+cols=80
+
+count=`expr \( $UM_LOUTPUT \* $cols / 128000 + 1 \)`
+                         # Print and remove output file
+  dd bs=1024k count=$count $TRUNC  if=$OUTPUT && rm $OUTPUT
+if $LONGOUTPUT; then
+    banner " OUTPUT2"
+                                  # Print and remove output file
+    count2=`expr \( $cols \* 1 \)`
+    dd bs=1024k count=$count2 $TRUNC if=$OUTPUT2 && rm $OUTPUT2
+fi
+
+if test $UM_PROCT = true && $UM_ATMOS = true; then
+  banner 'RCF OUTPUT'
+  echo '%RCF OUTPUT%'
+
+  if test -a $RCF_MPP_OUTPUT_A; then
+    dd bs=1024k count=$count  $TRUNC \
+    if=$RCF_MPP_OUTPUT_A && rm $RCF_MPP_OUTPUT_A
+  fi
+
+  if test -a $UM_MPP_OUTPUT; then
+    dd bs=1024k count=$count  $TRUNC \
+    if=$UM_MPP_OUTPUT && rm $UM_MPP_OUTPUT
+  fi
+
+  if test $PART = RUN; then
+    banner 'All PE* OUTPUT'
+    echo "%PE* OUTPUT%\n"
+    integer n=1
+
+    while ((n < $UM_NPES))
+    do
+     echo "%PE$n OUTPUT%"
+     file="$UM_STDOUT_FILE"$n
+     tail -10 $file
+     ((n = n + 1))
+    done
+  fi
+
+  if test $RCMASTER -eq 0; then
+    # Delete remaining fort.6 output files if run completed OK
+    if test $UM_DEL_MPP_OUTPUT = true -a ! -z "$UM_STDOUT_FILE"; then
+      # Check that model run output files exist first
+      if test -r "$UM_STDOUT_FILE"1; then
+        rm "$UM_STDOUT_FILE"*
+      fi
+    fi
+    if test $RCF_DEL_MPP_OUTPUT = true -a ! -z "$RCF_STDOUT_FILE_A"; then
+      # Check that reconfiguration atmos output files exist first
+      if test -r "$RCF_STDOUT_FILE_A"1; then
+        rm "$RCF_STDOUT_FILE_A"*
+      fi
+    fi
+  fi
+fi # test for mpp and UM job 
+
+if $AUTOMATIC_PP; then
+    banner " AUTOPP_TIDYUP"
+    echo %AUTOPP_TIDYUP
+                                  # Print and remove output file
+    count=`expr \( $cols \* 2 \)`
+    dd bs=1024k count=$count $TRUNC \
+     if=$AUTOPPOUT
+    banner " SERVER"
+    echo %SERVER
+                                  # Print and remove output file
+    count=`expr \( $cols \* 2 \)`
+    dd bs=1024k count=$count $TRUNC \
+     if=$SERVEROUT
+fi
+
+# If NEMO run then append extra output
+
+
+if [[ "$NEMO" = "true" || "$HADGEM3_COUPLED" = "true" ]]; then
+
+num=$(ls $DATAM/namelist $DATAM/ocean.output $DATAM/solver.stat 2>/dev/null | wc -l)
+
+
+  if [ $num -eq 3 ]; then
+   banner "NEMO NAMELIST"    
+   more $DATAM/namelist
+   banner "OCEAN.OUTPUT"
+   more $DATAM/ocean.output
+   banner "SOLVER.STAT"
+   more $DATAM/solver.stat
+   rm -f $DATAM/ocean.output $DATAM/solver.stat
+  else
+    echo "ERROR: problem with NEMO run, check ocean.output / solver.stat files"
+    exit 1
+  fi 
+  
+fi # test for NEMO 
+
+
+echo "Files in directory UM_DATAW = $UM_DATAW"
+ls -ls $UM_DATAW                     # Lists all files created in user
+echo "Files in directory UM_DATAM = $UM_DATAM"
+ls -ls $UM_DATAM                     # directories (including temporary
+echo "Files in directory TMPDIR = $TMPDIR"
+ls -ls $TMPDIR                      # files)
+
+if test $UM_SUITE = "false"; then
+echo 'Free disk space'
+DEV=`dirname $HOME`
+df $DEV
+fi
+
+if test $UM_SUITE = "false"; then
+########################################################################
+# Take appropriate action for resubmitted or stopped runs.
+# Otherwise delete files in $JOBDIR
+AUTOPPCODE=0
+. submitchk
+fi
+
+########################################################################
+echo "****************************************************************"
+echo "     Job ended at :  `date`"
+echo "****************************************************************"
+
+UM_END_MAIL=${UM_END_MAIL:-false}
+
+if $UM_END_MAIL; then
+  MESSAGE="Run ${EXPTID}${JOBID} finished. Time=`date`"
+  echo "$MESSAGE" | mailx -s "$MESSAGE" $UM_MAIL_ID
+fi
+
+
+return $RCMASTER
+
+
+# END OF FILE
+

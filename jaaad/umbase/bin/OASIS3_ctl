@@ -1,0 +1,246 @@
+#!/usr/bin/perl
+# Perl script to automatically modify namcouple files
+# with executable names, PE numbers, run time, etc
+# R. Hill   05/08/07
+#
+# Add machine_type argumement to distinguish between
+# platforms in order to set up appropriate format for
+# job execution configuration file. R. Hill 3/11/08
+#########################################################
+# Standard pragmas
+use strict;
+use warnings;
+
+my $namcpl_in     = $ARGV[0];
+my $atm_exec      = $ARGV[1];
+my $atm_nproc     = $ARGV[2];
+my $nemo_exec     = $ARGV[3];
+my $nemo_nproc    = $ARGV[4];
+my $machine_type  = $ARGV[5];
+my $atm_cpl_type  = $ARGV[6];
+my $nemo_cpl_type = $ARGV[7];
+
+my $start = 0;
+my $nbmod = 0;
+my $rtmod = 0;
+my $atm_nproc_cpl;
+my $nemo_nproc_cpl;
+
+my $namelist = 'namelist';
+my $conf_file ;
+my $line ;
+
+my $begin   = 0;
+my $end     = 0;
+my $ts      = 0;
+my $seconds = 0;
+
+my @chunks ;
+my @bits ;
+
+
+# If we are coupling through the master atmosphere PE
+# then we need to set OASIS to expect to deal with only 1
+# process. Otherwise we couple through all atmosphere PEs.
+if ( $atm_cpl_type eq "P" ) {
+    $atm_nproc_cpl = $atm_nproc;
+}
+else {
+    $atm_nproc_cpl = 1;
+}
+
+# If we are coupling through the master nemo PE
+# then we need to set OASIS to expect to deal with only 1
+# process. Otherwise we couple through all nemo PEs.
+if ( $nemo_cpl_type eq "P" ) {
+    $nemo_nproc_cpl = $nemo_nproc;
+}
+else {
+    $nemo_nproc_cpl = 1;
+}
+
+#
+# Read the NEMO controlling namelist and extract the run
+# length and timestep controls in order to update the OASIS3
+# control file. Try to cater for all (known) eventualities - ptic
+# NEMO version 3.0 whosae namelists include comments on data lines!
+open( F0, "< $namelist" );
+while (<F0>) {
+    my $line = $_;
+    chomp $line;
+
+    $line =~ s/^\s+//;    #remove leading spaces
+    $line =~ s/\s+$//;    #remove trailing spaces
+    
+    next if /^!/ ;        #skip comment-only lines
+    
+    #Strip out ALL characters after ! to cater for
+    #NEMO vn 3.0 style namelists.
+    @chunks = split( /!/, $line );
+    $line = $chunks[0];
+
+    if ( $line =~ m/=/ ) {
+
+        if ( $line =~ m/nit000/ ) {
+
+            @bits = split( /=/, $line );
+            $begin = $bits[1];
+            $begin =~ s/^\s+//;    #remove leading spaces
+            $begin =~ s/\s+$//;    #remove trailing spaces
+            print "begin= $begin \n";
+
+        }
+
+        if ( $line =~ m/nitend/ ) {
+
+            @bits = split( /=/, $line );
+            $end = $bits[1];
+            $end =~ s/^\s+//;      #remove leading spaces
+            $end =~ s/\s+$//;      #remove trailing spaces
+            print "end= $end \n";
+
+        }
+
+        if ( $line =~ m/rdt / ) {
+
+            @bits = split( /=/, $line );
+            $ts = $bits[1];
+            $ts =~ s/^\s+//;       #remove leading spaces
+            $ts =~ s/\s+$//;       #remove trailing spaces
+            print "ts= $ts \n";
+
+        }
+
+    }
+    ;                              # line has a variable defined on it.
+
+}    # while F0
+
+# Calculate the total number of timesteps for
+# the run.
+# In this version, we do not add 1 day to allow N+1 coupling
+# exchanges in N days - this caters for the rearranged model
+# timestepping where there is no final exchange prior to
+# dump creation.
+$seconds = ( $end - $begin + 1 ) * $ts;
+
+print "seconds total = $seconds \n";
+
+close(F0);
+
+my $namcpl_out = "namcouple";
+open( F1, "< $namcpl_in" );
+open( F2, "> $namcpl_out" );
+while (<F1>) {
+    $line = $_;
+
+    chomp $line;
+
+    if ( $line =~ m/\$CHANNEL/ ) {
+        $start = 1;
+    }
+
+    if ( $start == 1 ) {
+        if ( $line =~ m/\$END/ ) {
+            $start = 0;
+            print F2 " \$CHANNEL \n";
+            print F2 "   MPI1  NOBSEND \n";
+            print F2 "   $atm_nproc $atm_nproc_cpl \n";
+            print F2 "   $nemo_nproc $nemo_nproc_cpl \n";
+        }
+    }
+
+    if ( $line =~ m/\$NBMODEL/ ) {
+        $nbmod = 1;
+    }
+
+    if ( $nbmod == 1 ) {
+        if ( $line =~ m/\$END/ ) {
+            $nbmod = 0;
+            print F2 " \$NBMODEL \n";
+            print F2 "   2 $atm_exec $nemo_exec 99 99 \n";
+        }
+    }
+
+    if ( $line =~ m/\$RUNTIME/ ) {
+        $rtmod = 1;
+    }
+
+    if ( $rtmod == 1 ) {
+        if ( $line =~ m/\$END/ ) {
+            $rtmod = 0;
+            print F2 " \$RUNTIME \n";
+            print F2 "# Run time setting automated via NEMO\n";
+            print F2 "# namelist values (1 day added) \n";
+            print F2 "  $seconds \n";
+        }
+    }
+
+    if ( $start == 0 ) {
+        if ( $nbmod == 0 ) {
+            if ( $rtmod == 0 ) {
+                print F2 "$line \n";
+            }
+        }
+    }
+}
+
+close(F2);
+close(F1);
+
+# Create a config file for use with mpiexec/poe etc - ensuring
+# static process creation at start of run.
+# Avoid using the prism SPAWN option!
+
+$conf_file = "o3coupled.conf";
+
+open( F3, "> $conf_file" );
+
+for ($machine_type) {
+
+    /N/ and do {
+
+        # Machine type is NEC
+        print F3 "-n 1 -e oasis3 \n";
+        print F3 "-n $atm_nproc -e $atm_exec \n";
+        print F3 "-n $nemo_nproc -e $nemo_exec \n";
+        last;
+    };
+
+    /I/ and do {
+
+        # Machine type is IBM
+        print F3 "./oasis3 \n";
+
+        my $i = 0;
+
+        # We need one line for each instance of the
+        # the atmosphere exec
+        while ( $i < $atm_nproc ) {
+            $i++;
+            print F3 "./$atm_exec \n";
+        }
+
+        $i = 0;
+
+        # We need one line for each instance of the
+        # the nemo exec
+        while ( $i < $nemo_nproc ) {
+            $i++;
+            print F3 "./$nemo_exec \n";
+        }
+
+        last;
+    };
+
+    # If we don't have a recognised machine type then exit
+    print "Invalid platform for OASIS $machine_type \n";
+    die "$!";
+
+}
+
+close(F3);
+
+################################################
+# End of OASIS3_control
+################################################

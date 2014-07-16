@@ -1,0 +1,140 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script:  restartinfo
+#
+#  Purpose: Writes a file at the beginning of a run holding all the
+#           information needed to restart the run after it has been
+#           stoprunned or crashed.
+#
+#  Current Owner: W Roseblade    Date: 1/02/06
+#  Reviewer: M Saunby            Date: 1/02/06
+#
+#  Tested under OS version: UNICOS 8
+#  UM  version no: 4.1      Date of test: 1996
+#
+#  History:
+#   Model
+#  version  Date         Modification history:
+#    4.1    29/07/96     Original version.
+#    4.3    02/04/97     Add UMVERSION to variables held in restart
+#                        file. S. Mullerworth.
+#    4.3    25/04/97     Added test for restart file pre-existing.
+#                        K Rogers
+#    4.3    09/06/97     Modified code to produce a restart file for
+#                        both NRUNs and CRUNs.  Removed test for
+#                        existing restart file which is now in SCRIPT.
+#                        (S Robertson)
+#    4.4    15-08-97     Delete file for runid from $OPSYSERR and
+#                        $OPARCHERR if present L Wiles
+#    5.1    11/07/00     Variable Classification (W Roseblade).
+#    5.2    20/09/00     New Header Format W Roseblade
+#    6.0    26/11/03     New variable in restart file USR_TMP_DIR
+#                        -location of users tmp dir.
+#                         A. A. Dickinson
+#    6.1    04/08/04     Correct QSUB variable for NEC
+#                            A. A. Dickinson
+#    6.1    22/06/04     Use TMPDIR throughout UM Scripts
+#                         Anthony A. Dickinson
+#  6.2      25/08/06     Remove space between #! /bin/ksh W Roseblade.
+#
+#  Programming standard: UM Doc Paper 3A, version 1 (29/10/90)
+#
+#  External documentation:
+#    UM Doc Paper C0 - The top-level control system
+#
+#   Interface and arguments:   restartinfo
+#
+#   -------------------------------------------------------------------
+#
+#   Called by: qsexecute, autopp_tidyup.
+#   Calls    :  none
+#
+#   Imports :
+#     HOME         - User home directory
+#     LOGNAME      - Unix variable for user id
+#     OPSTARTDIR   - Directory for restart details
+#     OPARCHERR    - Directory where restartfile put if archive error
+#                    detected
+#     OPSYSERR     - Directory where restartfile put if system error
+#                    detected
+#     OUT_CLASS    - Class for output file in output directory
+#     OUT_CLASSR   - Class for resubmission output in output
+#                     directory
+#     QSUB_REQID   - Queue request to CRAY ie 76258.sn6702
+#     QSUB_REQNAME - Cray variable for job id
+#     RUNID        - Run id (expt id + job id)
+#     SUBMITID     - Dir containing job files under $HOME/umui_runs
+#     TMPDIR           - Temporary directory
+#     TYPE         - Run type, either NRUN or CRUN
+#     VN           - UM version used
+#
+#   Exports:
+#     none
+#
+#   Local variables: (see imports for descriptions)
+#     JOBNAME
+#     OUT_CLASS
+#     OUT_CLASSR
+#     RUNID
+#     RUN_TYPE
+#     SUB_NQSREQUEST
+#     SUBMITID
+#     UMUSER
+#     UMVERSION
+#     USRHOME
+#     USR_TMP_DIR
+#
+#   Files written
+#     $OPSTARTDIR/"$RUNID"-"$SUBMITID"  Restart information for this
+#                                       run.
+# End of header -------------------------------------------------------
+#L
+#L----------------------------------------------------------------------
+#L Step 0 - delete old entry in OPSYSERR and OPARCHERR
+#L----------------------------------------------------------------------
+#L
+if test -f $OPSYSERR/"$RUNID"*
+then
+  echo "qsmain: removal of restart file from $OPSYSERR"
+  rm $OPSYSERR/"$RUNID"*
+fi
+if test -f $OPARCHERR/"$RUNID"*
+then
+ echo "qsmain: removal of restart file from $OPSYSERR"
+ rm $OPARCHERR/"$RUNID"*
+fi
+
+if test $UMMACHINE = 'NECSX6'; then
+  QSUB_REQID=${PBS_JOBID#*:}
+  QSUB_REQNAME=$PBS_JOBNAME
+fi
+
+#L
+#L----------------------------------------------------------------------
+#L Step 1 - create file containing information needed by startrun script
+#L
+#L----------------------------------------------------------------------
+
+cat > $TMPDIR/runsubfile << EOF
+#   Variables needed by startrun script
+    UMVERSION=$VN
+    SUB_NQSREQUEST=$QSUB_REQID
+    RUNID=$RUNID
+    UMUSER=$LOGNAME
+    SUBMITID=$SUBMITID
+    USRHOME=$HOME
+    USR_TMP_DIR=$TMPDIR
+    RUN_TYPE=$TYPE
+    OUT_CLASS=$OUT_CLASS
+    OUT_CLASSR=$OUT_CLASSR
+    JOBNAME=$QSUB_REQNAME
+    JOB_OUTPUT=$MY_OUTPUT
+EOF
+
+cat $TMPDIR/runsubfile
+cp $TMPDIR/runsubfile $OPSTARTDIR/"$RUNID"-"$SUBMITID"

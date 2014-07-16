@@ -1,0 +1,447 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script: qsserver
+#
+#  Purpose: Top level script for server process which runs in parallel
+#           to the model run, archives data to another machine
+#
+#           The server reads archive requests by a pipe connected
+#           to the model and these requests are carried out on the
+#           dataset, ie ARCHIVE or DELETE.
+#  Current Owner: W Roseblade.
+
+#  Reviewer:      ?                 Date of review:  September 1994
+#
+#  Tested under OS version: UNICOS unknown
+#  UM   version no: 3.4      Date of test: unknown
+#
+#  History:
+#   Model
+#  version  Date         Modification history:
+#    3.4    25/11/94     Original Version. C D Perks
+#    4.0    05/04/95     Check for null or non-existent file. C D Perks
+#    4.0    07/06/95     Included RUN_FLAG variables for NRUNs and
+#                        CRUNs so that #new# occurs for first TF
+#                        in stream for NRUNs. C D Perks
+#    4.0    08/06/95     Included *) in MNFIELDS case statement.
+#                        C D Perks
+#    4.0    15/06/95     Swapped 'percent = %%%' test with test on
+#                        CURRENT_RQST_NAME to eliminate problems
+#                        linked with non '%%%' requests from model.
+#                        C D Perks
+#    4.0    14/08/95     Added variable ARCHTAPE. K Rogers
+#    4.1    26/03/96     Removed redundant ARCHTAPE in final
+#                        Section since covered in copy2dest. L Wiles
+#    4.1    02/04/96     Put non-portable trap command in if block.
+#                        L Wiles
+#    4.1    24/05/96     Changes for CRACER
+#                        Set up new variables for trigger file flags
+#                        Check duplex backup authority if necessary
+#                        Write reviewdate file if review system.L Wiles
+#    4.3    18/04/97     Add crackercheck directory.
+#                        Add new flag checks for trigger file entries.
+#                        L Wiles
+#    4.4    22/08/97     Add test for stoprun and exit to archfail.
+#                        L Wiles
+#    4.5    25/02/98     Omit test for stoprun and call to archfail if
+#                        operational
+#                        run. Initialise variable F_END_TF_COPY.
+#                        I Edmond
+#    4.5    17/08/98     Optimisation changes and warning if partial
+#                        archiving. I Edmond
+#    5.0    17/09/99     Global Variables removed:-
+#                            RUN_FLAG DMP_RUN_FLAG MPP_RUN_FLAG
+#                            PP_RUN_FLAG BF_RUN_FLAG MIX_RUN_FLAG
+#                            DB_RUN_FLAG PMP_RUN_FLAG EXPIRE_DATE
+#                            RETPD DMP_RETPD MPP_RETPD PP_RETPD
+#                            BF_RETPD MIX_RETPD DB_RETPD PMP_RETPD
+#                            TEST_AUTH RQST_TYPE RQST_ACTION
+#                        W Roseblade
+#    5.1     11/07/00    Variable Classification.W Roseblade
+#    5.2     11/08/00    Replace grep & sed with UM_? (R.Hatcher)
+#    5.2     19/09/00    New Header Format. W Roseblade
+#    5.3     25/10/01    MASS Archive code added W Roseblade
+#    5.4     20/08/02    Full archiving now only to MASS with
+#                        Partial Archiving still allowed to IBM
+#                        Front End. W Roseblade
+#    5.5     31/03/03    Code changes to allow both CR and NWP to
+#                        archive to MASS. W Roseblade
+#    6.0     25/09/03    Remove CRACER/UABRF code W Roseblade.
+#    6.1    22/06/04     Use TMPDIR throughout UM Scripts
+#                         Anthony A. Dickinson
+#    6.1    22/09/04     Remove redundant MASSFAIL code. W Roseblade
+#    6.2    24/11/05     Remove redundant CRACER code.
+#    6.2    24/11/05     Change from MASS_CREATE_T3E to
+#                        MASS_CREATE_STREAMS.
+#    6.2    24/11/05   Script tidy.
+#    6.2    24/11/05     Removal of METOCRAY,CRAYPVP logic,code.
+#                        W Roseblade
+#  6.2      25/08/06     Remove space between #! /bin/ksh W Roseblade.
+#
+#
+#  Programming Standard: UMDP 3 version unknown
+#
+#  External documentation:
+#    UMDP
+#
+#   Interface and arguments : qsserver none
+#
+#   -------------------------------------------------------------------
+#
+#  Called by : autopp_tidyup, qsexecute.
+#              $ERRFLAG
+#  Scripts called:
+#              archfail   - failure script produces .failure file
+#              qscasedisp -function to take action on each request
+#              $PPCNTL    - Post Processing control file from UMUI.
+#              nextGenid  - script to create the GENID
+#              archfail   - script tp halt UM run
+#
+#  Imports:
+#  ARCHSYS             - System archiveing required = true
+#                        Delete superceded dumps and script release
+#                        only = false
+#  DATAM               - Experiment directory on the Cray
+#  ERRFLAG             - File containing error flag to close down
+#                        model process
+#  JOBDIR              - Job directory.
+#                        ie ~t20wr/umui_runs/acoqp-271144635
+#  LOCKFILE            - The existence of this file indicates whether
+#                        the model is still executing
+#  MAIL                - Mail errors in archiving to user (M)
+#                        N if user not mailed
+#  MAIL_ID             - Mail address for archiving error messages
+#  NAMESPACE           - MASS Namespace ie CRUMOP
+#  OPERATIONAL         - Operational flag
+#  PERCENT             - Code to indicate type of request in pipe
+#  RUNID               - expeiment runid ie acoqa
+#  SETOPT              - Shell options
+#  TMPDIR                - Temporary directory
+#  TYPE                - Type of run either new or continuation
+#  UMMACHINE           - Target computer platform type
+#                        (eg NECSX6)
+#  USE_CAMELOT         - Use Camelot database (true/false)
+#  VN                  - UM version
+#
+#  Exports:   Note: These variables are used by scripts that are
+#                   all called in same shell so these variables
+#                   do not specifically need to be exported.
+#
+#  CURRENT_RQST_ACTION - Request current action (archive/delete)
+#  CURRENT_RQST_NAME   - Name of current model output file processing
+#  CURRENT_RQST_TYPE   - Data stream type: dump;pp;mean pp;bndy
+#  PPCNTL_ERR          - Flag for archfail if there is an error in any
+#                        of the ppcntl variable settings
+#
+#  Local variables:
+#  CC                  - error return code
+#  GENID               - new GENID for run ie ABCDE002
+#  LOGNAME             - users t20 logname ie t20ro
+#  RC                  - Return code from model input pipe
+#
+# End of header -------------------------------------------------------
+
+set -$SETOPT
+echo "qsserver: Starting..."
+
+if [[ $ARCHSYS = true ]] ; then
+echo
+echo "MASS archiving has been selected for this run."
+echo
+fi
+
+#----------------------------------------------------------------------
+# Step 0:Set shell options
+#        Send message to model if server process dies.
+#
+#        Note: If porting to other platforms please be aware that
+#              different signals may apply.
+#----------------------------------------------------------------------
+if [[ $UMMACHINE = NECSX6 ]]
+then
+    trap 'echo "T   Trapped server failure" >$ERRFLAG; exit'\
+ 1 2 3 4 5 6 7 8 12 13 14 15 30
+elif [[ $UMMACHINE = NECTX7 ]]
+then
+    trap 'echo "T   Trapped server failure" >$ERRFLAG; exit'\
+ 1 2 3 4 5 6 7 8 13 14 15 24
+else
+  echo "WARNING: Check this platform SIGNALS are trapped correctly"
+fi
+#L--------------------------------------------------------------------
+#L Run PPCNTL in same shell to set variables including user-supplied
+#L pp script if required.
+#L--------------------------------------------------------------------
+. $PPCNTL
+PPCNTL_ERR='false'
+
+#----------------------------------------------------------------------
+# Step 1: If operational or not archiving do nothing else set up
+# MASS variables.
+if [[ $OPERATIONAL = true || $ARCHSYS = false ]]
+then
+  :
+else
+  if [[ $UMMACHINE = NECSX6 ]]
+  then
+    if [[ $ARCHSYS = true ]]
+    then
+
+      # Temporary file for genlist time and output info.
+      # was /scratch which I dont think is visible from sx node ?
+      GENTMP="$TMPDIR/$RUNID.tmp.$$"
+
+      # Mail Message file.
+      MAILMSG="$TMPDIR/$RUNID.mailmsg.$$"
+
+      ##### Test if NWP or CR and set appropriate variables ######
+
+      if [[ $LOGNAME = "fr"[a-z][a-z] ]]
+      then
+        NAMESPACE=${NAMESPACE:-NWP}
+        USE_CAMELOT="false"
+      fi
+
+      if [[ $LOGNAME = "had"[a-z][a-z] || $LOGNAME = "c20"[a-z][a-z] ]]
+      then
+        NAMESPACE=${NAMESPACE:-CRUMOP}
+        USE_CAMELOT="true"
+      fi
+
+      # Set MAILSYS to value as specified by user
+      # or default of hadmass@hc0800
+
+      MAILSYS=${MAILSYS:-hadmass@hc0800}
+
+      CC=0
+      if [[ $TYPE = NRUN ]]
+      then
+        # run MASS_CREATE HERE
+        echo ""
+        echo "*****************************************\c"
+        echo "************************"
+        CREATE_OUT="$TMPDIR/$RUNID.create_out.$$"
+
+        if [[ $LOGNAME = "fr"[a-z][a-z] ]]
+        then
+          echo "Replace CR Template with NWP equivalent"
+
+          if grep "CR_S" $JOBDIR/MASS_CREATE_STREAMS 1>/dev/null 2>&1
+          then
+            echo "Altering CR_S template to NWPSMALL template"
+            cat $JOBDIR/MASS_CREATE_STREAMS|sed -e 's/CR_S/NWPSMALL/' \
+            > $JOBDIR/MASS_CREATE_NWP
+            rm $JOBDIR/MASS_CREATE_STREAMS
+            mv $JOBDIR/MASS_CREATE_NWP $JOBDIR/MASS_CREATE_STREAMS
+          fi
+          if grep "CR_L" $JOBDIR/MASS_CREATE_STREAMS 1>/dev/null 2>&1
+          then
+            echo "Altering CR_L template to NWP_E template"
+            cat $JOBDIR/MASS_CREATE_STREAMS|sed -e 's/CR_L/NWP_E/' \
+            > $JOBDIR/MASS_CREATE_NWP
+            rm $JOBDIR/MASS_CREATE_STREAMS
+            mv $JOBDIR/MASS_CREATE_NWP $JOBDIR/MASS_CREATE_STREAMS
+          fi
+        fi
+
+        chmod u+x $JOBDIR/MASS_CREATE_STREAMS
+
+        CREATE_OUT="$TEMP/$RUNID.create_out.$$"
+        echo "CREATE_OUT set to $CREATE_OUT"
+        $JOBDIR/MASS_CREATE_STREAMS $NAMESPACE 1> $CREATE_OUT 2>&1
+        CC=$?
+        echo "Finished MASS_CREATE_STREAMS script at `date`"
+        # Exit if USERID could not be obtained from users .MOUSEPrv.rc
+        if test $CC -eq 2
+        then
+          echo "qsserver: MASS_CREATE_STREAMS generated fatal error $CC"\
+          >$MAILMSG
+          echo "Please see the QSSERVER section of \c">>$MAILMSG
+          echo "the latest output for this run on \c">>$MAILMSG
+          echo "`hostname` for details of the MASS error.">>$MAILMSG
+          cat $CREATE_OUT >> $MAILMSG
+          cat $MAILMSG
+          . archfail $MAILMSG
+          exit 1
+        fi
+        if test $CC -ne 0
+        then
+          # mail hadmass
+          echo "`hostname`: ERROR running \c"> $MAILMSG
+          echo "MASS_CREATE_STREAMS $NAMESPACE for $RUNID." >>$MAILMSG
+          echo "Please see the QSSERVER section of \c">>$MAILMSG
+          echo "the latest output for this run on \c">>$MAILMSG
+          echo "`hostname` for details of the MASS error.">>$MAILMSG
+          echo  `date` >> $MAILMSG
+          cat $CREATE_OUT >> $MAILMSG
+          mailx -s "CREATE ERROR" $MAILSYS  < $MAILMSG
+            echo "Errors found running MASS_CREATE_STREAMS."
+            echo "This is either because there is a \c"
+            echo "MASS outage or a real error possibly \c"
+            echo "with set up of $HOME/.MOUSEPrv.rc file."
+            echo "Please retry with another NRUN later."
+            echo "Server terminated !"
+            echo "CRUM have been informed."
+            echo
+            echo "----------------------------------------"
+            echo "Output from MASS_CREATE_STREAMS follows:-"
+            cat $CREATE_OUT
+            rm $CREATE_OUT 1> /dev/null 2>&1
+            . archfail $MAILMSG
+            exit 1
+        else
+          echo "MASS_CREATE script completed successfully"
+        fi
+        echo "*****************************************\c"
+        echo "************************"
+        echo""
+
+        # Set genidType for later call to get GENID for the job.
+        genidType=1
+      else
+        # CRUN
+        genidType=0
+      fi
+
+      # Do not call genlist if create fails as it may hang if server out
+      # This check is irrelevant if MASSFAIL=STOP
+      if [[ $CC -ne 0 ]] ; then
+        echo "CREATE failure. Therefore genlist not called."
+        GENID=OUTAGE01
+        CC=0
+      else
+        echo "qsserver: Creating GENID..."
+echo "the following vars were set before call to nextGenid :-"
+echo "RUNID=$RUNID"
+echo "genidType=$genidType"
+echo "NAMESPACE=$NAMESPACE"
+echo "GENTMP=$GENTMP"
+echo "MAILSYS=$MAILSYS"
+
+GENID=`nextGenid $RUNID $genidType $NAMESPACE $GENTMP $MAILSYS`
+
+        CC=$?
+      fi
+      if [[ $CC -ne 0 || "$GENID" = "GLERR001" ]] ; then
+        echo "===========================================" >$MAILMSG
+        echo "qsserver: Problem getting Generation ID    ">>$MAILMSG
+        echo "qsserver: Error code from nextGenid: $CC   ">>$MAILMSG
+        echo "===========================================">>$MAILMSG
+        cat $MAILMSG
+          echo "Server terminated !"
+          echo "Please see the QSSERVER section of \c">>$MAILMSG
+          echo "the latest output for this run on \c">>$MAILMSG
+          echo "`hostname` for details of the MASS error.">>$MAILMSG
+          . archfail $MAILMSG
+          exit 1
+      else
+        # genlist was successful (in getGenidList) so there will be a
+        # .tmp file. Print to output genlist time(seconds)and genlist
+        # output info contained in this file.
+
+      cat $GENTMP
+      rm  $GENTMP 1> /dev/null 2>&1
+      fi
+
+      echo "qsserver: GENID for this run is $GENID"
+
+
+    fi # [[ $ARCHSYS = true ]]
+  fi   # End of code for Met Office Cray only
+fi  # end of code for non OPERATIONAL variables
+
+
+#L----------------------------------------------------------------------
+#L Step 2:Remove any old versions of DATAM/RUNID.requests
+#L        Start reading a line at a time from the input pipe
+#L        Nb: first read is a dummy (PERCENT not set to '%%%')
+#L----------------------------------------------------------------------
+
+if [[ -s $DATAM/$RUNID.requests ]]
+then
+  rm $DATAM/$RUNID.requests
+fi
+RC=0
+while (( $RC == 0 ))
+do
+if test $OPERATIONAL = 'false'
+then
+  # Test for operator stoprun and archfail if job has been stopped
+  $UM_GREP "stoprun: Operator" $ERRFLAG > $TMPDIR/$RUNID.stopped
+  if [[ -s $TMPDIR/$RUNID.stopped ]]
+  then
+    . archfail
+    exit
+  fi
+fi
+  read PERCENT CURRENT_RQST_NAME CURRENT_RQST_ACTION CURRENT_RQST_TYPE \
+  DATA_TYPE
+  RC=$?
+
+# Copy the input request to a file in case data remains on cray disk
+
+  echo "$PERCENT $CURRENT_RQST_NAME $CURRENT_RQST_ACTION \
+  $CURRENT_RQST_TYPE" >> $DATAM/$RUNID.requests
+
+#----------------------------------------------------------------------
+# Step 3a:Deal with each request from the input pipe
+#----------------------------------------------------------------------
+
+  if (( $RC == 0 ))
+  then
+    if [[ $PERCENT = %%% ]]
+    then
+      echo "qsserver: `date`: "\
+      $CURRENT_RQST_NAME $CURRENT_RQST_ACTION $CURRENT_RQST_TYPE
+      if [[ $OPERATIONAL = false ]]
+      then
+        if [[ $CURRENT_RQST_ACTION = REL ]]
+        then
+          . qscasedisp
+        elif [[ -s $CURRENT_RQST_NAME ]]
+        then
+          if [[ $CURRENT_RQST_TYPE = "BNDY" ]]
+          then
+            if [[ ${CURRENT_RQST_NAME##'$P'} != $CURRENT_RQST_NAME ]]
+            then
+              CURRENT_RQST_ACTION='DELETE'
+            fi
+          fi
+          . qscasedisp
+        else
+          echo "$CURRENT_RQST_NAME is zero length or does not exist:"
+          echo "next request"
+        fi
+#----------------------------------------------------------------------
+# Step 3b:Straight to qscasedisp if operational
+#----------------------------------------------------------------------
+      else
+        . qscasedisp
+      fi
+    fi
+  else
+#----------------------------------------------------------------------
+# Step 4:Check for end of data and call script to close down process
+#----------------------------------------------------------------------
+
+    if [[ -f $LOCKFILE ]]    # LOCKFILE indicates model still executing
+    then
+      echo "qsserver: EOF on PIPE but model still executing - waiting"
+      sleep 2
+      PERCENT="xxx"
+      RC=0
+#----------------------------------------------------------------------
+# Step 5:No LOCKFILE, so genuine EOF - Wrap up server.
+#       Transfer remaining trigger files to front-end.
+#----------------------------------------------------------------------
+    else
+       echo "Server process:... Ending"
+    fi
+  fi
+done
+

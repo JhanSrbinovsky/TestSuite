@@ -1,0 +1,81 @@
+ 
+export RUNID=jaaad
+export USERID=jxs599
+export UM_ROUTDIR=/short/p66/jxs599/UM_ROUTDIR/$USERID/$RUNID
+export UM_RDATADIR=/short/p66/$USER/$RUNID
+export UM_EXENAME=$RUNID.exe
+
+# Base build
+# ~~~~~~~~~~
+fcm build -v 3 -f -j 4 $UM_ROUTDIR/umbase/cfg/bld.cfg
+
+RC=$?
+if test $RC -eq 0 ; then 
+    echo Base build:  OK
+else
+    echo Base build:  failed
+    exit $RC 
+fi
+
+# Model build
+# ~~~~~~~~~~~
+fcm build -v 3 -f -j 4 $UM_ROUTDIR/ummodel/cfg/bld.cfg
+
+RC=$?
+if test $RC -eq 0 ; then 
+    echo Model build:  OK
+else
+    echo Model build:  failed
+    exit $RC 
+fi
+
+# Reconfiguration build
+# ~~~~~~~~~~~~~~~~~~~~~
+fcm build -v 3 -j 4 $UM_ROUTDIR/umrecon/cfg/bld.cfg
+
+RC=$?
+if test $RC -eq 0 ; then 
+    echo Reconfiguration build:  OK
+else
+    echo Reconfiguration build:  failed
+    exit $RC 
+fi
+
+# Link separate builds to the top level bin dir 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+
+mkdir -p  $UM_RDATADIR/bin
+
+if test -d $UM_ROUTDIR/umbase/bin ; then
+   chmod 755 $UM_ROUTDIR/umbase/bin/* 1>/dev/null 2>&1
+   cp $UM_ROUTDIR/umbase/bin/*  $UM_RDATADIR/bin/ 1>/dev/null 2>&1
+fi
+
+if test -x $UM_ROUTDIR/ummodel/bin/$UM_EXENAME ; then
+   cp $UM_ROUTDIR/ummodel/bin/$UM_EXENAME $UM_RDATADIR/bin/ 1>/dev/null 2>&1
+fi
+
+if test -x $UM_ROUTDIR/um_nemo_cice/bin/model.exe ; then
+   cp $UM_ROUTDIR/um_nemo_cice/bin/model.exe $UM_RDATADIR/bin/ 1>/dev/null 2>&1
+fi
+
+if test -x $UM_ROUTDIR/nemo_cice/bin/model.exe ; then
+   cp $UM_ROUTDIR/nemo_cice/bin/model.exe $UM_RDATADIR/bin/ 1>/dev/null 2>&1
+fi
+
+if test -x $UM_ROUTDIR/nemo/bin/model.exe ; then
+   cp $UM_ROUTDIR/nemo/bin/model.exe $UM_RDATADIR/bin/ 1>/dev/null 2>&1
+fi
+
+if test -x $UM_ROUTDIR/cice/bin/CICE.exe ; then
+   cp $UM_ROUTDIR/cice/bin/CICE.exe $UM_RDATADIR/bin/ 1>/dev/null 2>&1
+fi
+
+if test -x $UM_ROUTDIR/umrecon/bin/qxreconf ; then
+   cp $UM_ROUTDIR/umrecon/bin/qxreconf $UM_RDATADIR/bin/ 1>/dev/null 2>&1
+fi
+# Clean up empty files from the build directory
+if test -d $UM_ROUTDIR ; then
+  find $UM_ROUTDIR -size 0 | xargs rm -f
+fi
+ 

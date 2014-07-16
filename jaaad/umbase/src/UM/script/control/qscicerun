@@ -1,0 +1,92 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script:  qscicerun
+#
+#  Purpose: Handles standalone CICE running.
+#
+#  Programming Standard: UMDP 3 version unknown
+#
+#  External documentation: -
+#
+#  Interface and Arguments:   qscicerun
+#
+#   -------------------------------------------------------------------
+#
+#   Called by: qsmaster
+#   Calls:     qscicesetup
+#
+#  Imports:
+#
+#    AUTO_RESTART    - flag to indicate if automatic resubmission 
+#                      has been enabled
+#    DATAM           - directory name in which model executes
+#    DATAW           -
+#    OCNMODULE       - load module for CICE
+#    OUTPUT          - printed output filename
+#    CICE_NPROC      - Number of PEs on which to run the model
+#
+#  Exports:
+#
+#  Local Variables:
+#
+#    CC          - Error flag for main run script
+#
+# End of header -------------------------------------------------------
+
+#-------------------------------------------------
+# Step 1: Setup model
+#-------------------------------------------------
+
+echo
+echo "$0: Executing CICE setup script"
+echo
+
+qscicesetup
+
+
+#-------------------------------------------------
+# Step 2: Run model
+#-------------------------------------------------
+
+echo
+echo "$0: Executing model run"
+echo
+echo "*********************************************************"
+echo "CICE Executable : $OCNMODULE"
+echo "*********************************************************"
+echo 
+
+
+cd $DATAM 
+
+
+if [[ $NECMPP = true ]]; then
+
+ mpirun -np $CICE_NPROC $OCNMODULE >>$OUTPUT
+ 
+elif [[ $IBM = true && $MPP = true ]]; then
+
+ poe $OCNMODULE -proc $CICE_NPROC >>$OUTPUT
+
+else
+
+ $OCNMODULE >>$OUTPUT
+
+fi 
+
+CC=$?
+
+if test $CC -ne 0; then
+   echo
+   echo "$0: Error executing CICE"
+   echo
+else
+   echo
+   echo "$0: CICE run completed"
+   echo
+fi

@@ -1,0 +1,186 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script: qscasedisp
+#
+#  Purpose: Process an archiving request i.e. delete or copy file
+#           to secondary system. Also releases user script if
+#           necessary.
+#
+#  Current Owner: W Roseblade
+#  Reviewer: unknown               Date of review: August 1994
+#
+#  Tested under OS version: UNICOS unknown
+#  UM   version no: 3.4    Date of test:  <date of test>
+#
+#  History:
+#   Model
+#  version  Date         Modification history:
+#    3.4    07/12/94     Original Version C D Perks
+#                        NB: CURRENT_RQST_DISP,RQST_DISP changed
+#                        to CURRENT_RQST_ACTION,RQST_ACTION
+#                        User script now runs under calling shell.
+#    4.0    06/06/95     Introduced RUN_FLAG for NRUNs. C D Perks
+#    4.0    14/12/95     Variable for trigger name replaces "HCEAFU"
+#                        L Wiles
+#    4.1    16/04/96     Changes for CRACER. Make 1st line of trigger
+#                        file always blank.
+#                        Set CRACER Code for stream type and change
+#                        trigger name.
+#                        Calculates number of files in trigger file
+#                        according to byte size. L Wiles
+#    4.4    15/10/97     Write times of deletions of dump files to a log
+#                        file for production runs. K Rogers
+#    4.5    16/09/98     Use different temporary variable to TEMP in REL
+#                        section to avoid problems with real TEMP.
+#                        K Rogers
+#    4.5    17/08/98     Optimisation changes  I Edmond
+#    5.0    17/09/99     Removal of RUN_FLAG. W Roseblade.
+#    5.1    10/07/00     Variable Classification W Roseblade
+#    5.2    11/08/00     Replace awk with UM_AWK. (R.Hatcher)
+#    5.2    19/09/00     New Header Format W Roseblade
+#    6.0    25/09/03     Remove CRACER/UABRF code W Roseblade.
+#    6.1    22/09/04     Remove redundant MASSFAIL code. W Roseblade
+#    6.2    24/11/05     Remove redundant CRACER code.
+#    6.2    17/02/06     Removal of METOCRAY,CRAYPVP logic,code.
+#                        W Roseblade
+#    6.2    25/08/06     Remove space between #! /bin/ksh W Roseblade.
+#    6.2    19/09/06     Remove CCMASS=2,3 masscamelot fail options.
+#
+#  Programming Standard: UMDP 3 version unknown
+#
+#  External documentation:
+#    <UMDP number & name of external documentation> Y1 ?
+#
+#  Interface and Arguments: none
+#
+#---------------------------------------------------------------------
+#  Called by: qsserver
+#  Calls:     qsmass
+#             archfail
+#
+#  Imports:
+#    CRPRODRUN            - True if run is a CR production run
+#    CURRENT_RQST_ACTION  - Archive or delete file
+#    CURRENT_RQST_NAME    - Name of current request
+#    DATAM                - User cray experiment dirn.
+#    LOGNAME              - Variable containing userid
+#    OPERATIONAL          - Test for operational run
+#    QSUB_REQID           - Queue request
+#    RUNID                - Experiment and jobname
+#    TYPE                 - Run type (Normal or continuation)
+#
+#  Exports:
+#
+#  Local Variables:
+#    DATE_MADE            - Date from $CURRENT_RQST_NAME
+#                           i.e. Nov 9 20:55
+#    REL_MEMBER           - User-supplied postprocessing script
+#    TEMP_REL             - temporary variable for script release
+#
+#  NB: Other variables in argument list pass through qscasedisp
+#      for use in hds_transfer_text, copy2dest, and ppcrayformat
+#
+# End of header -------------------------------------------------------
+
+
+#L----------------------------------------------------------------------
+#L Step 1:Request to delete current file
+#L----------------------------------------------------------------------
+
+case $CURRENT_RQST_ACTION in
+  DELETE)   if [[ $OPERATIONAL = true ]]
+            then
+              rm $DATAM/$CURRENT_RQST_NAME
+            else
+              rm $DATAM/$CURRENT_RQST_NAME
+              CC=$?
+              if (( $CC == 0 ))
+              then
+                echo "$CURRENT_RQST_NAME deleted"
+              else
+                echo "$CURRENT_RQST_NAME - unable to delete"
+              fi
+            fi
+            ;;
+#L----------------------------------------------------------------------
+#L Step 2:Request to archive current file
+#L----------------------------------------------------------------------
+
+  ARCHIVE)
+
+#----------------------------------------------------------------------
+# Call qsmass to archive datasets to MASS if ARCHSYS true.
+#----------------------------------------------------------------------
+
+if [[ $ARCHSYS = true ]]
+then
+  timstart=$SECONDS
+  qsmass $CURRENT_RQST_NAME $LOGNAME $HOME $VN $TYPE $USE_CAMELOT \
+$GENID $NAMESPACE $MAILSYS
+
+  CCMASS=$?
+  timstop=$SECONDS
+  let tim=$timstop-$timstart
+  if test $CCMASS -eq 0
+  then
+    echo "qsmass: Successfully archived $CURRENT_RQST_NAME in \c"
+    echo "$tim seconds."
+  elif test $CCMASS -eq 1
+  then
+      echo "qsmass: Failed to archive \c" > $MAILMSG
+      echo "$CURRENT_RQST_NAME in $tim seconds." >> $MAILMSG
+      echo "Please resubmit your run if it has not \c" >> $MAILMSG
+      echo "already been restarted by the operators."  >> $MAILMSG
+      cat $MAILMSG
+      echo "Please see the QSSERVER section of \c">>$MAILMSG
+      echo "the latest output for this run on \c">>$MAILMSG
+      echo "`hostname` for details of the MASS error.">>$MAILMSG
+      . archfail $MAILMSG
+      exit 1
+  fi    # CCMASS
+fi          # ARCHSYS true
+;; # end of ARCHIVE case
+
+#L----------------------------------------------------------------------
+#L Step 3:Request to execute user-supplied pp script
+#L----------------------------------------------------------------------
+
+  REL)        echo "Executing user-supplied pp script"
+              TEMP_REL=`echo "\\$$CURRENT_RQST_NAME"`
+              TEMP_REL=`eval echo $TEMP_REL`
+              REL_MEMBER=`eval echo $TEMP_REL`
+              $REL_MEMBER                # No specified shell
+              CC=$?
+
+              if [[ $OPERATIONAL = true ]]
+              then
+                :
+              else
+                if test $CC -eq 1
+                then
+          echo "======================================================="
+          echo "qsserver: user script $REL_MEMBER completed with errors"
+          echo "======================================================="
+                elif test $CC -eq 2
+                then
+          echo "======================================================="
+          echo "qsserver: fatal error in $REL_MEMBER model run stopped"
+          echo "======================================================="
+                  . archfail
+                  exit $CC
+                elif test $CC -ne 0
+                then
+          echo "======================================================="
+          echo "qsserver: $REL_MEMBER completed with errors no return"
+          echo "          code supplied in user script. Assumed safe"
+          echo "          to continue model run"
+          echo "======================================================="
+                fi
+              fi
+            ;; # end of REL case
+esac

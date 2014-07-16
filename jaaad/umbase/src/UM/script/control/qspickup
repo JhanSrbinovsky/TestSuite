@@ -1,0 +1,106 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script:  qspickup
+#
+#  Purpose: Append temporary or interim history record to end of
+#           permanent history file after model run completes.
+#
+#  Current Owner: W Roseblade    Date: 1/02/06
+#  Reviewer: M Saunby            Date: 1/02/06
+#
+#  Tested under OS version: UNICOS 5.1.10
+#  UM   version no: 2.0      Date of test: 15 July 1991
+#
+#  History:
+#   Model
+#  version  Date         Modification history:
+#    ?      16/07/91     qspickup renamed from qserror_pickup as new
+#                        script handles normal as well as error
+#                        post-processing.   (TCJ)
+#                        In-line documentation also improved.
+#    ?       8/02/93     FILENV environment variable removed, assign
+#                        statements replaced with UNIT environment
+#                        variables for FORTRAN I/O portability.
+#    3.5    16/05/95     Introduced UNIT09 for copy of old history file
+#    4.4    28/05/97     assign statements for namelist reads on t3e
+#                        protected by *DEF CRAYF90 for portability. LCW
+#    5.1    11/07/00     Variable Classification (W Roseblade).
+#    5.2    19/09/00     New Header Format W Roseblade
+#    5.3    31/08/01     Replace nupdate directives with UNIX 'if'
+#                        statements. (R.Hatcher)
+#    6.1    22/06/04     Use TMPDIR throughout UM Scripts
+#                         Anthony A. Dickinson
+#  6.2      25/08/06     Remove space between #! /bin/ksh W Roseblade.
+#
+#  Programming standard: UM Doc Paper 3A, version 1 (29/10/90)
+#
+#  External documentation:
+#    UM Doc Paper C0 - The top-level control system
+#
+#   Interface and arguments
+#
+#   qspickup from_hist perm_hist_file
+#
+#     {from_hist} ::= interim history file to update from (input)
+#     {perm_hist_file} ::= permanent history file (input/output)
+#
+#   -------------------------------------------------------------------
+#
+#   Called by: qsprelim script
+#              qsfinal script
+#   Calls    : qxpickup executable
+#
+#   Imports:
+#     CRAYF90       - Flag to indicate CRAYF90 platform.
+#     OUTPUT        - Formatted output file
+#     RUNID         - Experiment/job ie abcde
+#     SETOPT        - Shell options
+#     TMPDIR          - Temporary directory name
+#     TMPDIR        - Temp directory
+#
+#   Exports:
+#     FILENV        - FORTRAN file environment
+#     UNIT09
+#     UNIT12        - FORTRAN unit environment
+#     UNIT10
+#
+#   Local variables:
+#     CC            - Completion code
+#
+# End of header -------------------------------------------------------
+#L Step 0 - Set up environment variables
+#L
+set -$SETOPT
+#L----------------------------------------------------------------------
+#L Step 1 - Execute load module, appending standard output to OUTPUT
+#L
+UNIT09=$TMPDIR/$RUNID.chist
+UNIT12=$1
+UNIT10=$2
+if test -f $UNIT10
+then
+  cp $UNIT10 $UNIT09
+fi
+export UNIT09 UNIT12 UNIT10
+#
+if [[ $CRAYF90 = true ]]; then
+  FILENV=$TMPDIR/qspickup_assign
+  assign -R qspickup_assign
+  assign -f 77 g:sf
+fi
+
+qxpickup >>$OUTPUT
+#
+CC=$?
+if test $CC -ne 0
+then
+  echo "$0: Failure in qxpickup"
+  exit 135
+else
+  echo "$0: Normal completion"
+fi

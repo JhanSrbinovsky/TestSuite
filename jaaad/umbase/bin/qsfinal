@@ -1,0 +1,198 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script:  qsfinal
+#
+#  Purpose: Performs history file post-processing for UM
+#           Resubmits jobscript if appropriate for UM and
+#           other models.
+#
+#
+#  Programming standard: UM Doc Paper 3A, version 1 (29/10/90)
+#
+#  External documentation:
+#    UM Doc Paper C0 - The top-level control system
+#
+#   Interface and arguments:   qsfinal run_id
+#
+#     {run_id} ::= 5 character run identifier
+#
+#   -------------------------------------------------------------------
+#
+#   Called by: qsmaster
+#   Calls    : qspickup script
+#              qshistprint script
+#              qshistreset script
+#              qsresubmit script
+#
+#   Imports:
+#
+#     AUTOMATIC_PP  - true if post processing
+#     CICE          - Flag to indicate CICE run
+#     CRAYF90       - Flag to indicate CRAYF90 platform
+#     CRAYJOB       - location of jobscript on Cray
+#     EXITSTAT      - Exit processing status file (created in qsmain)
+#     JOBSCRIPT     - Jobscript filename
+#     NEMO          - Flag to indicate NEMO or NEMOCICE run
+#     OPERATIONAL   - Operational flag
+#     PHIST         - Permanent history filename
+#     RUNID         - Experiment/job ie abcde
+#     SETOPT        - Shell options
+#     TMPDIR        - Temporary directory name
+#     THIST         - Temporary history filename
+#     TMPDIR        - Temp directory
+#     UM_ATMOS      - Flag to indicate UM run
+#     XHIST         - Interim history filename (on exit from model)
+#
+#   Exports:
+#
+#     FILENV        - FORTRAN file environment
+#
+#   Local variables:
+#
+#     FROMHIST      - Which history file to pickup from (blank if none)
+#     RSUB          - Filename of local file for resubmit details
+#
+# End of header -------------------------------------------------------
+#L
+#L----------------------------------------------------------------------
+#L Step 0 - Set up environment variables
+#L
+set -$SETOPT
+
+if [[ "$UM_ATMOS" = "true" ]]; then
+
+ RSUB=$TMPDIR/rsub.$$           # Resubmit file path
+
+  #L----------------------------------------------------------------------
+  #L Step 1 - UM History file processing and stranded output handling
+  #L
+  #L Step 1.1 - Update PHIST using XHIST or THIST according to exit
+  #L            processing return status from qsmain and OPERATIONAL flag
+  #L
+  
+  if [[ $CRAYF90 = true ]]; then
+  
+    FILENV=$TMPDIR/qsfinal_assign
+    assign -R qsfinal_assign
+    assign -f 77 g:sf
+  fi
+  
+  FROMHIST=
+  
+  if test -s $THIST; then
+  
+    # keep a copy of the thist file if it exists with a unique suffix
+    # - this can be copied back to $RUNID.thist to aid error recovery
+    # with some kinds of failures.
+    cp $THIST $THIST.$$
+    echo qsfinal: thist file copied to $THIST.$$
+  fi
+
+  if $OPERATIONAL; then
+  
+    if test -f $XHIST; then    
+      if test -s $XHIST; then      
+        FROMHIST=$XHIST                # pickup from XHIST if available	
+      fi
+    else    
+      if test -f $THIST; then
+        if test -s $THIST; then	
+          FROMHIST=$THIST              # .. otherwise from THIST	  
+        fi
+      fi
+    fi
+  else
+    if test -s $EXITSTAT; then           # Error occurred in exit processing    
+      echo "$0: Error in exit processing after model run"
+      cat $EXITSTAT
+      echo     
+      if test -f $THIST; then   
+        if test -s $THIST; then	
+          FROMHIST=$THIST              # .. pickup from THIST not XHIST	  
+        fi	
+      fi      
+    else                               # No error in exit processing
+      if test -f $XHIST; then
+        if test -s $XHIST; then
+          FROMHIST=$XHIST              # .. pickup from XHIST if available
+        fi
+      else
+        if test -f $THIST; then
+          if test -s $THIST; then
+            FROMHIST=$THIST            # .. pickup from THIST if not
+          fi
+        fi
+      fi
+    fi
+  fi # Check for Operational
+  
+  
+  if test -z "$FROMHIST"; then
+  :                                 # No history update to make
+  else
+    qspickup $FROMHIST $PHIST         # Update permanent history
+    if test $? -eq 0; then
+     rm $THIST 2>/dev/null           # Delete temporary history
+    fi
+  fi
+   #L
+   #L Step 1.2 - Reset and printout record from PHIST
+   #L
+  if test -f $PHIST; then                # PHIST existing file
+    if $OPERATIONAL; then                # Operational model
+      qshistreset $PHIST
+      CC=$?
+      if test $CC -ne 0; then
+        echo "$0: Model $1 - Failure in histreset"
+        exit 135                                 # Abort if failure
+      fi
+    fi
+    qshistprint $PHIST $RSUB
+    CC=$?
+    if test $CC -ne 0; then
+      echo "$0: Model $1 - Failure in histprint"
+      exit 135                                   # Abort if failure
+    fi
+  else
+    echo "$0: Model $1 - Error: No history files"
+    exit 135                                     # Abort if no hist files
+  fi
+  #L----------------------------------------------------------------------
+  #L Step 2 - Model resubmission (details picked up from file $RSUB)
+  #L
+  if $OPERATIONAL; then
+    :
+  else
+    qsresubmit $JOBSCRIPT $RSUB
+  fi
+
+fi # Check for UM Model
+
+if [[ "$NEMO" = "true" ]]; then
+
+  echo "Attempting nemo resubmit......."
+  
+  RSUB=$DATAM/nemo_resub           # Resubmit file path
+
+  qsresubmit $JOBSCRIPT $RSUB
+
+else # Check for NEMO / NEMOCICE standalone model
+
+  if [[ "$CICE" = "true" ]]; then
+
+    echo "Attempting cice resubmit......."
+  
+    RSUB=$DATAM/cice_resub           # Resubmit file path
+
+    qsresubmit $JOBSCRIPT $RSUB
+
+  fi # Check for CICE standalone model
+
+fi # Check for NEMO / NEMOCICE model
+
+#L----------------------------------------------------------------------

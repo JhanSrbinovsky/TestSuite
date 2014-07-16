@@ -1,0 +1,280 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script:  qsmaster
+#
+#  Purpose: Top level control of model runs and also qsfinal script.
+#           Handles error conditions at UNICOS level.
+#
+#  Programming standard: UM Doc Paper 3A, version 1 (29/10/90)
+#
+#  External documentation:
+#    UM Doc Paper C0 - The top-level control system
+#
+#   Interface and arguments:  qsmaster job_id
+#
+#     job_id ::= 5 character job identifier
+#
+#   -------------------------------------------------------------------
+#
+#   Called by: jobscript
+#   Calls    : qsexecute script (if run involves UM atmos)
+#              qsnemorun (if NEMO or NEMOCICE run)
+#              qscicerun (if CICE run)
+#              qsfinal script
+#
+#   Imports:
+
+#     CICE          - Flag to indicate CICE only run
+#     DATAW         - User-specific read/write data files
+#     NEMO          - Flag to indicate NEMO or NEMOCICE only run
+#     RUNID         - Experiment/job ie abcde
+#     SETOPT        - Shell options
+#     STEP          - Run type (4 = run 99 = run recon only).
+#     TMPDIR        - Temporary directory pathname
+#     TYPE          - Run type ie NRUN, CRUN.
+#     UM_ATMOS      - Flag to indicate UM run
+#
+#   Exports:
+
+#     CCMAIN       - Completion code of main script being called
+#     E_NORMAL     - Error return code (normal completion)
+#     E_ABORT      - Error return code (abort condition)
+#     ERRFLAG      - File used to transfer error information
+#     EXITSTAT     - File for communicating exit processing status
+#     FTXX         - Fortran unit cross-reference filename
+#     IHIST        - Interim history filename (input to model)
+#     MAIN_SCR     - Name of the main script being called
+#     THIST1       - Backup file for THIST.
+#     XHIST        - Interim history filename (after model exit)
+#
+#   Local variables:
+#     CC           - Error return code
+#     CCFINAL      - Completion code of final script
+#     E_USAGE      - Error return code (incorrect usage)
+#     RUN_DONE     - Indicates if the model executable has been run
+#
+# End of header -------------------------------------------------------
+#L Local functions
+#L
+start_banner ()
+{
+  echo "***************************************************************"
+  echo "   Starting script :   $1"
+  echo "   Starting time   :   `date`"
+  echo "***************************************************************"
+  echo
+}
+
+
+export MAIN_SCR=qsmaster
+
+if [[ "$UM_ATMOS" = "true" ]]; then
+
+  #L Step 0.0 - validate correct usage
+  #L
+  E_USAGE=99
+  RUN_DONE=false
+ 
+  if test $# -ne 1; then
+   echo "$0: Usage is \"$0 model_id\""; exit $E_USAGE
+  fi
+ 
+  #L
+  #L Step 0.1 - set up unified model environment
+  #L
+  set -$SETOPT
+  IHIST=$TMPDIR/$RUNID.ihist
+  XHIST=$TMPDIR/$RUNID.xhist
+  FTXX=$TMPDIR/$RUNID.ftxx
+  EXITSTAT=$TMPDIR/$RUNID.exstat
+  THIST1=$DATAW/$RUNID.thist_keep
+ 
+  if test $TYPE = "NRUN" && test $THIST1 = "true"; then
+   rm $THIST1  # There should be no .thist files at start of run
+  fi
+  E_NORMAL=0
+  E_ABORT=135
+  CCMAIN=0
+  export IHIST XHIST THIST1 FTXX E_NORMAL E_ABORT EXITSTAT ERRFLAG CCMAIN
+
+
+  #L
+  #L Step 0.2 - move to temporary directory
+  #L
+  cd $TMPDIR
+  CC=$?
+ 
+  if [[ $CC -ne 0 ]]; then
+   echo $0 : cd to $TMPDIR has failed
+   exit $CC
+  fi
+
+
+  if [[ $STEP -eq 99 ]]; then
+ 
+   echo "*************************************"
+   echo "**  Reconfiguring without running  **"
+   echo "*************************************"
+   echo
+  
+  fi
+
+
+  start_banner qsexecute
+  MAIN_SCR="qsexecute"
+  qsexecute $1
+  CCMAIN=$?
+  RUN_DONE=true
+
+
+  if test $CCMAIN -ne 0; then
+ 
+    echo "*****************************************************************"
+    echo "   Ending script   :   $MAIN_SCR"
+    echo "   Completion code :   $CCMAIN"
+    echo "   Completion time :   `date`"
+    echo "*****************************************************************"
+    echo "\n\n\n"
+    echo
+    echo "$0: Failed in $MAIN_SCR in model $1" >&2
+  else
+    echo "*****************************************************************"
+    echo "   Ending script   :   $MAIN_SCR"
+    echo "   Completion code :   0"
+    echo "   Completion time :   `date`"
+    echo "*****************************************************************"
+    echo "\n\n"
+  fi
+  #
+
+  #L
+  #L If main script was reconfiguration only,
+  #L don't execute final script
+
+
+  if [ $STEP -eq 99 ]; then
+ 
+    if test $CCMAIN -ne 0; then
+      exit $CCMAIN
+    else
+      exit $E_NORMAL
+    fi
+  fi
+
+fi # Check if UM model
+
+if [[ "$NEMO" = "true" ]]; then
+
+
+  CCMAIN=0
+
+  start_banner qsnemorun
+  MAIN_SCR="qsnemorun"
+  qsnemorun
+  CCMAIN=$?
+  RUN_DONE=true
+
+
+  export MAIN_SCR CCMAIN
+
+  if test $CCMAIN -ne 0; then
+ 
+    echo "*****************************************************************"
+    echo "   Ending script   :   $MAIN_SCR"
+    echo "   Completion code :   $CCMAIN"
+    echo "   Completion time :   `date`"
+    echo "*****************************************************************"
+    echo "\n\n\n"
+    echo
+    echo "$0: Failed in $MAIN_SCR in model $1" >&2
+  else
+    echo "*****************************************************************"
+    echo "   Ending script   :   $MAIN_SCR"
+    echo "   Completion code :   0"
+    echo "   Completion time :   `date`"
+    echo "*****************************************************************"
+    echo "\n\n"
+  fi
+
+else 
+
+  if [[ "$CICE" = "true" ]]; then
+
+
+    CCMAIN=0
+
+    start_banner qscicerun
+    MAIN_SCR="qscicerun"
+    qscicerun
+    CCMAIN=$?
+    RUN_DONE=true
+
+    export MAIN_SCR CCMAIN
+
+    if test $CCMAIN -ne 0; then
+ 
+      echo "*****************************************************************"
+      echo "   Ending script   :   $MAIN_SCR"
+      echo "   Completion code :   $CCMAIN"
+      echo "   Completion time :   `date`"
+      echo "*****************************************************************"
+      echo "\n\n\n"
+      echo
+      echo "$0: Failed in $MAIN_SCR in model $1" >&2
+    else
+      echo "*****************************************************************"
+      echo "   Ending script   :   $MAIN_SCR"
+      echo "   Completion code :   0"
+      echo "   Completion time :   `date`"
+      echo "*****************************************************************"
+      echo "\n\n"
+    fi
+ 
+  fi # Check if CICE model
+
+fi # Check if NEMO model
+
+#
+#L----------------------------------------------------------------------
+#L Step 3 - Run final script (even if main script failed)
+#L
+echo "*****************************************************************"
+echo "   Starting script :   qsfinal"
+echo "   Starting time   :   `date`"
+echo "*****************************************************************"
+echo
+qsfinal $1
+CCFINAL=$?
+if test $CCFINAL -ne 0
+then
+  echo "*****************************************************************"
+  echo "   Ending script   :   qsfinal"
+  echo "   Completion code :   $CCFINAL"
+  echo "   Completion time :   `date`"
+  echo "*****************************************************************"
+  echo "\n\n\n"
+  echo
+  echo "$0: failed in final in model $1" >&2
+else
+  echo "*****************************************************************"
+  echo "   Ending script   :   qsfinal"
+  echo "   Completion code :   0"
+  echo "   Completion time :   `date`"
+  echo "*****************************************************************"
+  echo "\n\n"
+fi
+#L
+#L Exit to calling shell with appropriate completion code
+#L
+if test $CCMAIN -ne 0
+then
+  exit $CCMAIN
+else
+  exit $CCFINAL
+fi
+#L----------------------------------------------------------------------

@@ -1,0 +1,148 @@
+#!/usr/bin/perl -w
+#    was #/usr/lbin/perl -w
+# *****************************COPYRIGHT******************************
+# (c) CROWN COPYRIGHT 2000, METEOROLOGICAL OFFICE, All Rights Reserved.
+# Please refer to file $UMDIR/vn$VN/copyright.txt for further details
+# ********************************************************************
+
+#
+#  Script:  nextGenid
+#
+#  Purpose: Computes the generation runid.
+#
+#  Current Owner: W Roseblade
+#  Reviewer     :                 Date of review: ?
+#
+#  Tested under OS version : 2.0.5.37
+#  UM version no:      Date of test:
+#
+#  History:
+#  Model
+#  Version  Date         Modification history:
+#  Version  Date         Mo
+#    5.0    27/02/01     Original version. S.D.Mullerworth
+#    5.0    23/05/01     Add body to getGenidList. (R.S.Hatcher)
+#    5.5    31/03/03     Code changes to allow both CR and NWP to
+#                        archive to MASS. W Roseblade.
+#    6.0    09/01/04     Remove redundant GENID code as genlist
+#                        much simpler W Roseblade.
+#    6.2    10/01/05     Add missing argument in call to genlistMail
+#                        plus general tidy W Roseblade.
+#
+#  Programming standard: UMDP 3, version 7.2
+#
+#  External documentation: none
+#
+#  Interface and arguments:-
+#
+#   nextGenid <runid> <genidType> <namespace> <gentmp> <mailsys>
+#
+#  <runid>      Run ID of the job
+#  <genidType>  1 for NRUN  create new GENID
+#               0 for CRUN  use previous NRUN GENID
+#  <namespace>  namespace ie CRUMOP
+#  <gentmp>     temp file for genlist messages
+#  <mailsys>    mail account for messages
+#
+#       Result : Prints value of new ID and returns 0. Or prints an
+#                error and returns with a non-zero code.
+#
+#  -------------------------------------------------------------------
+#
+#  Called by: qsserver
+#  Calls: none
+#
+#  Imports:
+#    runid      - Run ID of the job
+#    nextGen    - Flag to indicate return of new ID or latest ID
+#    namespace  - namespace ie CRUMOP
+#    gentmp     - temp file for genlist messages
+#    mailsys    - mail account for messages
+#
+#  Exports: none
+#
+#  Local variables:
+#    list       - List of generation IDs used in a given job
+#    newGenid   - New generation id for this run
+#    cmd        - massls command.
+#    gentmp    - Temp file for genlist time info
+#
+#
+#
+# End of header -------------------------------------------------------
+
+my ($runid,$nextGen,$namespace,$gentmp,$mailsys)=@ARGV;
+
+    my @idList = (); # For the first time new experiment is run.
+    # Get a list of existing generation IDs for this job
+    @idList = getGenidList($runid,$namespace,$nextGen,$gentmp,
+             $mailsys);
+
+$newGenid=pop @idList;
+
+    # Echo result
+    print "$newGenid";
+# genlistMail
+#   Mails hadmass account details of the users genlist command that
+#   was run together with the genlist error produced.
+
+sub genlistMail {
+   my ($namespace,$runid,$mailsys,@list) = @_;
+    my $date;
+    chomp( $date=`date`);
+open(MAIL,"|mailx -s \"MASS: genlist problems $date\" $mailsys");
+      print MAIL "Problem running genlist $namespace $runid at $date\n";
+      print MAIL "@list";
+      close MAIL;
+}
+
+
+# getGenidList
+#   Return a list of generation IDs used in a given job
+
+sub getGenidList {
+   my ($runid,$namespace,$nextGen,$gentmp,$mailsys) = @_;
+    my %seen;
+    my (@list,$cmd,@res);
+    my ($rubbish,$gentime,@gentime,$date,$rc1);
+
+    # If NRUN ie $nextGen set to 1 run genlist with no -c argument.
+    if ($nextGen eq "1") {
+   $cmd ="genlist_mh $namespace $runid 2>&1";
+      @list = `$cmd`;
+      $rc1 = $?;
+      if ($rc1) {
+        # Mail hadmass with error.
+        genlistMail($namespace,$runid,$mailsys,@list);
+        return "GLERR001"; # return GenListERRor for GENID.
+      }
+    }
+
+    # If CRUN ie $nextGen set to 0 run genlist with -c argument.
+    if ($nextGen eq "0") {
+  $cmd ="genlist_mh -c $namespace $runid 2>&1";
+      @list = `$cmd`;
+      $rc1 = $?;
+      if ($rc1) {
+        # Mail hadmass with error.
+        genlistMail($namespace,$runid,$mailsys,@list);
+        return "GLERR001"; # return GenListERRor for GENID.
+      }
+    }
+
+
+    # chomp array to get all elements in single line.
+    chomp @list;
+
+    open(GENTMP,">$gentmp")||warn "getGenidList: Problem"
+    ." opening $gentmp $!\n";
+
+    chomp( $date=`date`);
+    print GENTMP "genlist $date @list\n";
+    close GENTMP;
+
+
+    return @list;
+
+}
+

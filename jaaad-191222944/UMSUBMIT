@@ -1,0 +1,183 @@
+#!/bin/sh
+#**
+#**NAME
+#**      umsubmit - submit a processed UMUI job to the supercomputer
+#**
+#**SYNOPSIS
+#**      umsubmit -h host [-u remote user id] 
+#**                   [-l local user id] job_name
+#**
+#**DESCRIPTION
+#**      This command carries out the procedure for submitting UM jobs
+#**      to batch without needing to enter the umui. 
+#**
+#**      The remote user ID defaults to your user ID on the local 
+#**      platform (from the $LOGNAME environment variable).
+#**
+#**      The user ID of the user submitting the job must be included 
+#**      in the .rhosts file of the user ID on the supercomputer
+#**      otherwise a permission denied error will result.
+#**
+#**      It is normally assumed that the files are held in directory
+#**      ~/umui_jobs/job_name as they would be after being processed
+#**      in the UMUI. However, the -l option can be used to submit a
+#**      job whose files are held under another account. Eg. if user 
+#**      hadsm has been asked by hadro to submit a job owned by hadro 
+#**      to t3ea while she is away, hadsm can run:
+#**
+#**      umsubmit -h t3ea -u t20ro -l hadro abcde
+#**
+#**      which will submit job library ~hadro/umui_jobs/abcde to batch
+#**      on t3ea under userid t20ro. Userid hadsm needs to be listed in the 
+#**      .rhosts file for t20ro to allow this.
+#**
+#**      The submission process is as follows: The processed job library
+#**      is copied to the ~/umui_runs directory on the supercomputer; the
+#**      directory name is appended with a date-stamp to distinguish it
+#**      from previous submissions. The date-stamp is also added to the 
+#**      SUBMIT script through a sed command and the SUBMIT script is 
+#**      given execute permissions. This script runs the SUBMIT
+#**      script on the remote host which creates the scripts required to
+#**      execute the run. The fcm script is then executed to extract the
+#**      code and do the actual submission of the job to the batch queues
+#**      and report the location of the output or any errors that occur.
+#**
+#**OPTIONS
+#**
+#**      -h host      Name of remote host machine.
+#**
+#**      -u userid    User id on remote host machine. Default is $LOGNAME.
+#**
+#**      -l local uid User id of person who owns the processed job 
+#**                   library.
+#**
+#**AUTHOR
+#**      S.D.Mullerworth 23.1.96
+#**      -l option added 1.3.00
+#**      Erasmus and linux changes 1.7.03
+#**      Remove t3e related options
+#**      Use -h argument in example 1/9/06
+#**      Use ssh/scp. Also make fcm compatible 30/9/08
+#**
+
+#==============================================================================
+# RCS Header:
+#   File         [$Source: /home/hc0300/umui/srce_code/UMUI_archive/umui2.0/vn7.3/processing/umsubmit,v $]
+#   Revision     [$Revision: 1.2 $]     Named [$Name: head#main $]
+#   Last checkin [$Date: 2009/02/24 11:14:25 $]
+#   Author       [$Author: hadsm $]
+#==============================================================================
+
+me=$(basename $0)
+
+usage="Usage: $me -h host [-u remote_uid] [-l local_uid] runid runscript"
+
+set -- `getopt h:u:l: $*`
+returnCode=$?
+if test $returnCode -ne 0; then
+    echo $usage
+    exit
+fi  
+
+# Default options
+remote_shell_command="ssh -q"
+remote_copy_command="scp -q"
+localuid=`whoami`
+
+while [ "$1" != -- ]
+do
+  if test $# = 1; then
+    echo $usage
+    exit 1
+  fi
+  case $1 in
+    -h) host="$2";;
+    -u) uid="$2";;
+    -l) localuid="$2";;
+  esac; shift; shift
+done;shift
+exp_id=$1
+shift
+runscript=$1
+
+if [ $# != 1 ]; then
+  echo $usage
+  exit 1
+fi
+
+if test -z "$host"; then
+  echo Specify machine name to run on
+  echo $usage
+  exit 1
+fi
+
+homeDir=`eval cd ~$localuid;pwd`
+if test $? != 0; then
+  echo Unable to find ~$localuid - check that $localuid is a valid user
+  exit 1
+fi
+
+# If user ID not supplied then set it dependent on host
+if test -z "$uid"; then
+  # Default User ID is the same as local user ID
+  uid=$LOGNAME
+fi
+
+# Obtain unique id by using date and time
+submitid=`date +%j%H%M%S`
+# Directory on this machine which holds processed files
+processedDir=$homeDir/umui_jobs/$exp_id
+# Directory on host to which files will be copied
+rundir=umui_runs/$exp_id-$submitid
+# File name of executable script
+runfile=SUBMIT
+
+if ! test -d $processedDir; then
+  echo Job library directory $processedDir could not be found
+  exit 1
+fi
+
+# This checks whether or not the job is from UMUI 4.1 or later
+# If it is a different submission method is required.
+test=`grep ":::submitid:::" $processedDir/$runfile`
+if [ -z "$test" ]; then
+  # Command which will be executed on host machine
+  # UMUI Versions < 4.1
+  run_cmd="SUBMITID=$submitid ; export SUBMITID ; . $rundir/$runfile"
+else
+  # Command which will be executed on host machine
+  # UMUI Versions 4.1 and above
+  run_cmd="$rundir/$runfile"
+fi
+
+# echo "Creating directory..."
+$remote_shell_command $host -l $uid -n "mkdir -p umui_runs"
+CC=$?
+if test $CC -eq 0; then 
+  # echo "Initialising $runfile..."
+  cat $processedDir/$runfile |\
+    sed s/:::submitid:::/$submitid/g >\
+    /tmp/$runfile.$exp_id.$submitid
+
+  # echo "Copying files..."
+  $remote_copy_command -r $processedDir $uid@$host:$rundir 
+  $remote_copy_command /tmp/$runfile.$exp_id.$submitid $uid@$host:$rundir/$runfile
+  rm /tmp/$runfile.$exp_id.$submitid
+
+  # echo "Changing $runfile permissions..."
+  $remote_shell_command $host -l $uid -n \
+    chmod 755 $rundir/$runfile
+
+  # Submit to host machine batch queue. Unique name of directory (i.e. that
+  # containing the submitid string) is passed to shell within the run_cmd
+  # string because $submitid was immediately substituted by its value
+  # echo "Submitting..."
+  
+  
+  $remote_shell_command $host -l $uid -n $run_cmd
+  CC=$?
+  if test $CC -eq 0; then 
+    echo "Submitting ${rundir}/${runscript}"
+    $remote_shell_command $host -l $uid -n "/opt/pbs/bin/qsub ${rundir}/${runscript}"
+  fi
+fi

@@ -1,0 +1,276 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script: makebc
+#
+#  Purpose: utility to make a boundary dataset from model dumps
+#
+#  Current Owner: W Roseblade    Date: 1/02/06
+#  Reviewer: M Saunby            Date: 1/02/06
+#
+#  Tested under OS version: UNICOS unknown
+#  UM   version no: ?  Date of test: unknown
+#
+#  History:
+#   Model
+#  version  Date         Modification history:
+#    4.4    2/6/97       Original version Ian Edmond
+#    4.5    01/09/98     Removed UMVERSION. K Rogers
+#    4.5    01/10/98     Initialise UM_SECTOR_SIZE. D. Robinson.
+#    4.5c   31.03.99     Changed version from 4.5 to 4.5c. W Roseblade
+#    5.0    2.03.99      Changed version from 4.5 to 5.0. W Roseblade
+#    5.1    04/05/00     Added TARGET_MC to cater for different build
+#                        configurations (R.Hatcher)
+#    5.1    14/03/00     Changed version from 5.0 to 5.1. W Roseblade
+#    5.2    14/09/00     New Header Format W Roseblade
+#    5.2    27/10/00     Set TARGET_MC using tx7 tag (R.Hatcher)
+#    5.3    12/12/01     Cater for exported value of EXEC (M.Hughes)
+#    6.1    19/08/04     Changes to allow generation of LBCs for
+#                        multiple LAMs in a single run (R.Sempers)
+#    6.1    15/09/04     Introduce exchange of @vn@ tag for $VN
+#                        in util scripts.               P.Dando
+#    6.1    23/09/04     Replace exit 0 with exit $CC.
+#                        W Roseblade.
+#    6.4    08/02/07     Change executable name from makebc to makebc.exe
+#                        to resolve potential name conflicts between wrapper
+#                        script and executable. R Sempers.
+#
+#  Programming standard: UMDP 3, version <UMDP 3 version number>
+#
+#  External documentation:
+#    <UMDP number & name of external documentation>
+#
+#   Interface and arguments:
+#
+#   makebc -n namelist -i dump1 [[dump2][dump3]...]
+#          -o[w] output_boundary_dataset [[output_boundary_dataset2]...]
+#
+#   3 or more arguments as follows:
+#
+#        -n             Specifies next argument is the namelist
+#        namelist       Pathname of file containing namelist
+#                       specifing details of ancilliary file
+#
+#        -i             Specifies that next argument(s) are the input
+#                       dumps or fieldsfiles
+#        dump1          Pathname(s) of input dump(s) or fields file(s)
+#        [[dump2]..]    used in the creation of boundary dataset
+#
+#        -o[w]          Specifies the next arguments as output lbc files
+#                       (w switch enables automatic overwrite if files
+#                       already exist)
+#         output_boundary_dataset
+#         [[output_boundary_dataset2]..[output_boundary_dataset8]]
+#
+#   -------------------------------------------------------------------
+#   Called by: user
+#   Calls    : makebc
+#
+#   Imports:
+#     TMPDIR         - Directory in which output redirected to.
+#     VN             - Version number of the program library to be used.
+#
+#   Exports:
+#     bc_namelist
+#     BCFIL${bc_filenum}
+#     FILE${filenum}
+#     UM_SECTOR_SIZE - UM sector size
+#     UNIT22         - Stashmaster file
+#
+#   Local variables:
+#     EXEC           - Directory containing executable
+#     FILE??         - Input dump filenames
+#     filenum
+#     bc_filenum
+#
+#     namelist_read  - Logicals which are used to decide what
+#     input_file       each argument is being read in for
+#     output_file
+
+# End of header -------------------------------------------------------
+#set -x
+
+
+#Set default Print Status
+export PRINT_STATUS=${PRINT_STATUS:-PrStatus_Normal}
+# Step 0 - Set up environment variables
+#
+
+# VN here is automatically set in this script at each UM build
+VN=@vn@
+
+# Directory for intermediate files
+TMPDIR=$SCRATCH
+TARGET_MC=@target_mc@
+
+
+# Directory containing executable
+EXEC=${EXEC:-$UMDIR/vn$VN/$TARGET_MC/exec}
+
+# UM Sector Size
+UM_SECTOR_SIZE=${UM_SECTOR_SIZE:-2048}
+export UM_SECTOR_SIZE
+
+export UNIT22=${MAKEBC_STASHMASTER:-$UMDIR/vn$VN/ctldata/STASHmaster}
+#assign -f 77 g:sf
+
+#Set up the initial values for filenum and bc_filenum
+# so that correct environment variables are generated
+filenum=30
+bc_filenum=0
+
+#Default values of logicals
+namelist_read=false
+input_file=false
+output_file=false
+bc_overwrite=false
+
+#Check for the minimum number of input arguments
+# generate error message if not
+if [ $# -lt 6 ]
+  then
+  echo "Usage: makebc -n namelist -i dump1 [[dump2][dump3]...] \
+-o output_boundary_dataset"
+
+    exit 1
+fi
+
+while [ $# -gt 0 ]
+do
+
+#Set logicals according to file type arguments
+    case $1 in
+      -n)
+#         echo $1
+         echo "set up the namelist"
+         namelist_read=true
+         input_file=false
+         output_file=false
+         shift
+         ;;
+
+      -i)
+#         echo $1
+         echo "set up the input files"
+         namelist_read=false
+         input_file=true
+         output_file=false
+         shift
+         ;;
+
+      -o)
+#         echo $1
+         echo "set up the output files"
+         namelist_read=false
+         input_file=false
+         output_file=true
+         bc_overwrite=false
+         shift
+         ;;
+
+      -ow)
+#         echo $1
+         echo "set up the output files (automatic overwrite enabled)"
+         namelist_read=false
+         input_file=false
+         output_file=true
+         bc_overwrite=true
+         shift
+         ;;
+
+    esac
+
+# Do this if it's a namelist argument
+    if [ $namelist_read = true ]
+       then
+       if [ ! -f $1 ]
+          then
+          echo "WARNING: file $1 does not exist"
+          exit 1
+       else
+          export bc_namelist=$1
+          shift
+       fi
+
+
+#And this if it's an input file
+    elif [ $input_file = true ]
+       then
+       filenum=`expr $filenum + 1`
+       if [ ! -f $1 ]
+          then
+          echo "WARNING: Input file $1 does not exist"
+          exit 1
+       else
+          export "FILE${filenum}"=$1
+          shift
+       fi
+
+
+#And finally if it's one of the output files
+    elif [ $output_file = true ]
+       then
+       bc_filenum=`expr $bc_filenum + 1`
+
+# Check if the lbc file already exists, if not export filename as
+# variable BCFILxx where xx is the sequential number
+# of LAM (one file per LAM)
+       if [ ! -f $1 ]
+          then
+          export "BCFIL${bc_filenum}"=$1
+          shift
+       else
+
+
+# If the lbc file already exists, overwrite if the overwrite flag is set
+# if not ask for user input
+          if [ $bc_overwrite = true ]
+             then
+             export "BCFIL${bc_filenum}"=$1
+             shift
+          else
+             echo "WARNING: Output file $1 already exists"
+             echo "Do you want to overwrite this file (y/n)?"
+             read option
+             case "$option" in
+                y)
+                  export "BCFIL${bc_filenum}"=$1
+                  shift
+                  ;;
+                n)
+                  exit 0
+                  ;;
+                *)
+                  echo "Invalid answer"
+                  exit 1
+                  ;;
+              esac
+          fi
+       fi
+    fi
+done
+
+#Export the name of the namelist to UNIT05
+export UNIT05=$bc_namelist
+
+
+#
+#Run the executable (serial version)
+#
+$EXEC/makebc.exe < $bc_namelist 1> $TMPDIR/makebc_out.$$ 2>&1
+
+
+CC=$?
+if [ $CC != 0 ]
+then
+echo 'Problem with MAKEBC program'
+fi
+
+cat $TMPDIR/makebc_out.$$
+echo 'MAKEBC output in:' $TMPDIR/makebc_out.$$
+
+exit $CC

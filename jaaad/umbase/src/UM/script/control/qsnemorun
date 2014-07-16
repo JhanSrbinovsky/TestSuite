@@ -1,0 +1,99 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script:  qsnemorun
+#
+#  Purpose: Handles standalone NEMO running.
+#
+#  Programming Standard: UMDP 3 version unknown
+#
+#  External documentation: -
+#
+#  Interface and Arguments:   qsnemorun
+#
+#   -------------------------------------------------------------------
+#
+#   Called by: qsmaster
+#   Calls:     qsnemosetup, qscicesetup (if NEMO-CICE)
+#
+#  Imports:
+#
+#    AUTO_RESTART    - flag to indicate if automatic resubmission 
+#                      has been enabled
+#    DATAM           - directory name in which model executes
+#    DATAW           -
+#    OCNMODULE       - load module for NEMO
+#    OUTPUT          - printed output filename
+#    TYPE            - run type (NRUN or CRUN)
+#    NEMO_NPROC      - Number of PEs on which to run the model
+#
+#  Exports:
+#
+#  Local Variables:
+#
+#    CC              - Error flag   
+#
+# End of header -------------------------------------------------------
+
+#-------------------------------------------------
+# Step 1: Setup model
+#-------------------------------------------------
+
+echo
+echo "$0: Executing NEMO setup script"
+echo
+
+qsnemosetup
+
+# If CICE is true then we are running a NEMOCICE combination
+
+if [[ "$CICE" = "true" ]]; then
+
+  qscicesetup
+
+fi
+
+#-------------------------------------------------
+# Step 2: Run model
+#-------------------------------------------------
+
+echo
+echo "$0: Executing model run"
+echo
+echo "*********************************************************"
+echo "NEMO Executable : $OCNMODULE"
+echo "*********************************************************"
+echo 
+
+
+cd $DATAM 
+
+if [[ $NECMPP = true ]]; then
+
+ mpirun -np $NEMO_NPROC $OCNMODULE >>$OUTPUT
+ 
+elif [[ $IBM = true && $MPP = true ]]; then
+
+ poe $OCNMODULE -proc $NEMO_NPROC >>$OUTPUT
+
+else
+
+ $OCNMODULE >>$OUTPUT
+
+fi 
+
+CC=$?
+CC=0
+if test $CC -ne 0; then
+   echo
+   echo "$0: Error executing NEMO"
+   echo
+else
+   echo
+   echo "$0: NEMO run completed"
+   echo
+fi

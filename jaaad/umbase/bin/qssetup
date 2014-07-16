@@ -1,0 +1,98 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script: qssetup
+#
+#  Purpose: Sets up interim control file and FORTRAN unit assignment
+#           file from master control and houskeeping file ( if
+#           operational)
+#
+#  Current Owner: W Roseblade    Date: 1/02/06
+#  Reviewer: M Saunby            Date: 1/02/06
+#
+#  Tested under OS version: UNICOS unknown
+#  UM   version no: ?      Date of test: unknown
+#
+#  History:
+#   Model
+#  version  Date         Modification history:
+#    ?      10/01/92     Replaced TMPDIR by TEMP. R A Stratton
+#    ?      8/02/93      Environment variable FILENV removed, assign
+#                        statements replaced with UNIT environment
+#                        variables for FORTRAN I/O portability.
+#                        C S Douglas
+#    ?      17/12/93     Included details of imports,exports,
+#                        and local variables. C D Perks
+#    ?      16/05/95     Removed UNIT01=housekeeping file
+#                        (now in qsmain). C D Perks
+#    ?      17/02/97     Add assign statements for namelist IO.
+#                        L C Wiles
+#    5.1    11/07/00     Variable Classification.  W Roseblade
+#    5.2    19/09/00     New Header Format. W Roseblade
+#    5.3    31/08/01     Replace nupdate directives with UNIX 'if'
+#                        statements. (R.Hatcher)
+#  6.2      25/08/06     Remove space between #! /bin/ksh W Roseblade.
+#
+#  Programming Standard: UMDP 3 version unknown
+#
+#  External documentation:
+#    UMDP
+#
+#   Interface and arguments: qssetup $1 $2 $3
+#
+# Arguments: $1 - Master control file
+#            $2 - Interim history file
+#            $3 - FORTRAN unit assignment file
+#
+#   -------------------------------------------------------------------
+#
+# Called by: UM prelim script
+# Calls    : none
+#
+#   Imports:
+#     CRAYF90  - Flag to indicate CRAYF90 platform.
+#     OUTPUT   -Output file for the job step
+#     SETOPT   -set shell options
+#     TMPDIR   -Temp directory
+#
+#   Exports:
+#     UNIT08   -pipe pathname for communication with qsserver
+#     UNIT11   -interim history file pathname
+#     UNIT13   -machineable version of external file table
+#
+#   Local variables:
+#     CC       -script/executable completion code
+#
+# End of header -------------------------------------------------------
+#L
+#L Step 0 - Setup environment variables
+#L
+set -$SETOPT
+#L
+#L Step 1  - Execute load module, appending standard output to OUTPUT
+#L
+UNIT08=$1
+UNIT11=$2
+UNIT13=$3
+export UNIT08 UNIT11 UNIT13
+#
+if [[ $CRAYF90 = true ]]; then
+  FILENV=$TMPDIR/qxsetup_assign
+  assign -R qxsetup_assign
+  assign -f 77 g:sf
+fi
+#
+qxsetup >>$OUTPUT
+#
+CC=$?
+if test $CC -ne 0
+then
+  echo "$0: Job failed"
+  exit 135
+else
+  echo "$0: Job terminated normally"
+fi

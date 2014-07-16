@@ -1,0 +1,32 @@
+!
+!  Absorption cross sections
+!  16/1/2006 include branching for ClONO2 (CNIT)
+!  9/3/2006  include branching for O2
+!
+      REAL ACCL4 (JPWAV),ACH2O (JPWAV),ACL2O2(JPWAV),AMCFM (JPWAV)
+      REAL ACNITA(JPWAV),ACNITB(JPWAV),ACO2  (JPWAV),AF11  (JPWAV)
+      REAL AF113 (JPWAV)
+      REAL AF12  (JPWAV),AF22  (JPWAV),AH2O  (JPWAV),AH2O2 (JPWAV)
+      REAL AHCL  (JPWAV),AHNO2 (JPWAV),AHNO3 (JPWAV),AHOCL (JPWAV)
+      REAL ACH3CL(JPWAV),AN2O  (JPWAV),AN2O5 (JPWAV),ANO   (JPWAV)
+      REAL ANO2  (JPWAV),ANO31 (JPWAV),ANO32 (JPWAV),AO2   (JPWAV)
+      REAL AO2A  (JPWAV),AO2B  (JPWAV)
+      REAL ABRCL (JPWAV),ABRNO3(JPWAV),ABRO  (JPWAV),AHOBR (JPWAV)
+      REAL AOCLO (JPWAV),AC2OA (JPWAV),AC2OB (JPWAV),AMHP  (JPWAV)
+      REAL AO2SR (JPWAV),AO3   (JPWAV),APNA  (JPWAV),ACOF2 (JPWAV)
+      REAL ACOFCL(JPWAV),ACH3BR(JPWAV),AF12B1(JPWAV),AF13B1(JPWAV)
+      REAL SCS   (JPWAV),QENO2 (JPWAV),QEO1D (JPWAV),QUANTA(JPWAV)
+      REAL ACH4  (JPWAV),WAVECM(JPWAV),WAVENM(JPWAV),AOBRO (JPWAV)
+      REAL AHONO (JPWAV),AOCS  (JPWAV),ASO2  (JPWAV)
+!
+      COMMON /CROSSEC/                                                  & 
+     &        ACCL4 ,ACH2O ,ACL2O2,ACNITA,ACNITB,ACO2  ,AF11  ,AF113 ,  &
+     &        AMCFM ,                                                   &
+     &        AF12  ,AF22  ,AH2O  ,AH2O2 ,AHCL  ,AHNO2 ,AHNO3 ,AHOCL ,  &
+     &        ACH3CL,AN2O  ,AN2O5 ,ANO   ,ANO2  ,ANO31 ,ANO32 ,AO2   ,  &
+     &        AO2A  ,AO2B  ,                                            & 
+     &        ABRCL ,ABRNO3,ABRO  ,AHOBR ,AOCLO ,AC2OA ,AC2OB ,AMHP  ,  &
+     &        AO2SR ,AO3   ,APNA  ,ACOF2 ,ACOFCL,ACH3BR,AF12B1,AF13B1,  &
+     &        ACH4  ,SCS   ,QENO2 ,QEO1D ,QUANTA,WAVECM,WAVENM,AOBRO ,  &
+     &        AHONO ,AOCS  ,ASO2
+!

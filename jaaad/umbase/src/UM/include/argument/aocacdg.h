@@ -1,0 +1,13 @@
+! AOCACDG; for ocean assimilation; documented in CODACDG
+     &  JO_NO_CAT_MAX, JO_NO_OP_DG, JO_MAX_OBS_DG, JO_MAX_SEL_DG,       &
+     &  JO_MAX_PRM_DG, JO_MAX_LEV_DG, LLO_MST_DG, JO_TIM_STP_DG,        &
+     &  JO_LEV_DG, LLO_AC_DG, LLO_OP_DG, LLO_51_DG, LLO_SEL_DG,         &
+     &  LLO_CAT_DG,JO_UNT_DG,JO_NO_PRT_DG,JO_NO_OBS_DG1,JO_ID_OBS_DG1,  &
+     &  JO_NO_SEL_DG1,JO_PO_SEL_DG1,JO_NO_ACC_DG1,JO_MOD_DG1,           &
+     &  O_LAT_N_DG1, O_LAT_S_DG1, O_LON_W_DG1,O_LON_E_DG1,LLO_TIT_DG1,  &
+     &  O_VAL_DG1, CCO_DES_DG1,CCO_TIT1_DG1,CCO_TIT2_DG1,CCO_TIT3_DG1,  &
+     &  CCO_TIT4_DG1, JO_JOB_ACC_DG1, JO_NE_GRD_DG1, LLO_JOB_DG1,       &
+     &  JO_CAT_DG2,JO_SUB_DG2, LLO_BND_DG2, O_LAT_PT_DG5, O_LON_PT_DG5, &
+     &  JO_COL_DG5,JO_ROW_DG5, JO_NE_AG_PT_DG5, JO_MAX_ACC_DG5,         &
+     &  JO_OB_ACC_DG5, JO_NE_GRD_DG5, LLO_JOB_DG5,                      &
+! AOCACDG end

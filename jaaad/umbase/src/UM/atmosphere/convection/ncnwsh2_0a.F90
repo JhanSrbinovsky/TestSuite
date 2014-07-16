@@ -1,0 +1,107 @@
+#if defined(A05_0A)
+!
+! SUBROUTINE NCNWSH2------------------------------------------------------------
+!
+! *****************************COPYRIGHT****************************************
+! (C) Crown copyright Met Office. All rights reserved.
+! For further details please refer to the file COPYRIGHT.txt which you should
+! have received as part of this distribution.
+! ******************************COPYRIGHT***************************************
+!
+
+SUBROUTINE ncnwsh2(row_length, rows, off_x, off_y, halo_i, halo_j, model_levels &
+         , wet_model_levels, r_rho_levels, r_theta_levels, timestep             &
+         , substep_number, rho, q, qcl, qcf, n_mmr, ccldbase, ccldtop, rainrate &
+         , accu_scav_nh3                                                        &
+         )
+
+!-------------------------------------------------------------------------------
+! Description:
+!   Dummy stub of NCNWSH2 which is called if Convection Scheme is disabled.
+!
+!   Current code owner:  R.A. Stratton
+!
+! Code Description:
+!   Language: FORTRAN 95
+!   This code is written to UMDP3 v8 programming standards.
+!
+! Documentation:  UMDP 20
+!
+!-------------------------------------------------------------------------------
+
+  IMPLICIT NONE
+
+! Arguments 
+! ---------
+  INTEGER, INTENT(IN) :: row_length               ! Number of point in row_length
+  INTEGER, INTENT(IN) :: rows                     ! Number of rows
+  INTEGER, INTENT(IN) :: off_x                    ! EW size of std. halo
+  INTEGER, INTENT(IN) :: off_y                    ! NS size of std. halo
+  INTEGER, INTENT(IN) :: halo_i                   ! EW extended halo
+  INTEGER, INTENT(IN) :: halo_j                   ! NS extended halo
+  INTEGER, INTENT(IN) :: model_levels             
+  INTEGER, INTENT(IN) :: wet_model_levels 
+  INTEGER, INTENT(IN) :: substep_number   
+
+  INTEGER, INTENT(IN) :: ccldbase (row_length, rows)   ! Convective cloud base
+  INTEGER, INTENT(IN) :: ccldtop  (row_length, rows)   ! Convective cloud top
+
+  REAL, INTENT(IN) :: timestep                         ! Timestep in secs
+  REAL, INTENT(IN) :: rainrate      (row_length, rows) ! Conv. srf
+                                                       ! rainrate(kg/m2)
+  REAL, INTENT(IN) :: accu_scav_nh3 (row_length, rows) ! Column total of
+                                                       ! scavenged NH3
+
+  REAL, INTENT(IN) :: q  (row_length, rows, wet_model_levels) ! Water vap(kg/kg)
+  REAL, INTENT(IN) :: qcl(row_length, rows, wet_model_levels) ! Water liq(kg/kg)
+  REAL, INTENT(IN) :: qcf(row_length, rows, wet_model_levels) ! Water ice(kg/kg)
+
+
+  REAL, INTENT(IN) :: r_rho_levels   (1-halo_i : row_length+halo_i,             &
+                                      1-halo_j : rows      +halo_j,             &
+                                                 model_levels)
+                                               ! Radius to Rho levels
+
+  REAL, INTENT(IN) :: r_theta_levels (1-halo_i : row_length+halo_i,             &
+                                      1-halo_j : rows      +halo_j,             &
+                                             0 : model_levels)
+                                               ! Radius to Theta levels
+
+  REAL, INTENT(IN) :: rho            (1-off_x  : row_length+off_x,              &
+                                      1-off_y  : rows      +off_y,              &
+                                                 model_levels)   ! Density*r*r
+
+  REAL, INTENT(IN) :: n_mmr          (1-off_x  : row_length+off_x,              &
+                                      1-off_y  : rows      +off_y,              &
+                                                 model_levels)   ! mmr n in NH3
+
+! Local Variables
+! ---------------
+
+  CHARACTER(Len=52)   :: Message
+  CHARACTER(Len=7 )   :: RoutineName
+  INTEGER             :: ErrorStat        ! Return code:
+                                          !   0 = Normal exit
+                                          ! +ve = Fatal Error
+                                          ! -ve = Warning
+
+!-------------------------------------------------------------------------------
+! Code Statements
+!-------------------------------------------------------------------------------
+        
+  ErrorStat   = 1
+  RoutineName = 'NCNWSH2'
+  Message     = 'Convection Scheme Routines unavailable - see output.'
+
+  WRITE (6,*) '**ERROR**: NCNWSH2 called but is unavailable.    '
+  WRITE (6,*) '  Sections 5: Convection Scheme is required '
+
+
+! DEPENDS ON: ereport
+  CALL ereport(RoutineName, ErrorStat, Message)
+        
+  RETURN
+
+!-------------------------------------------------------------------------------
+END SUBROUTINE ncnwsh2
+#endif

@@ -1,0 +1,128 @@
+#!/bin/ksh
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+#  Script:  submitchk
+#
+#  Purpose: For UM runs if stoprun has been called write information 
+#           for startrun to a file.
+#           For all models, checks whether a resubmit is required and 
+#           executes resubmit jobscript created previously by qsresubmit.
+#
+#           If neither resubmitting or stoprunned, deletes $JOBDIR.
+#
+#
+#  Current Owner: W Roseblade    Date: 1/02/06
+#  Reviewer: M Saunby            Date: 1/02/06
+#
+#  Tested under OS version: UNICOS 7.C
+#  UM version no: 4.0       Date of test: 09 Oct 1995
+#
+#  Programming standard: UM Doc Paper 3A, version 1 (29/10/90)
+#
+#  External documentation:
+#    UM Doc Paper C0 - The top-level control system
+#
+#   Interface and arguments:  submitchk none
+#
+#   -------------------------------------------------------------------
+#
+#   Called by: UMScr_TopLevel
+#   Calls    : none
+#
+#   Imports:
+#     AUTOPPCODE   - Flag for failed trigger file transfer
+#     ERRFLAG      - File containing info on whether run stopped
+#     HOME         - User home directory
+#     JOBDIR       - Dir containing job files to submit
+#     OPSTARTDIR   - Dir with info for operators for restarting runs
+#                    in the event of a crash.
+#     OPSTOPRUN    - Dir with info for restarting if operator stops
+#                    the runs.
+#     RCMASTER     - Archive error return code
+#     RESUB_FILE   - Script executed to resubmit run
+#     RUNID        - Run id (expt id + job id)
+#     SUBMITID     - Dir containing job files under $HOME/umui_runs
+#     TEMP         - Temporary directory
+#     UM_ATMOS     - Flag to indicate UM run
+#
+#   Exports: none.
+#
+#   Local variables:
+#     ARCHERR      - Archive error flag (true/false)
+#     DELJOBDIR    - Delete job directory flag (true/false)
+#     RCSERVER     - Server return code
+#     RMSERVER     - Server message
+#     STEP         - Run type (ie 0,1,2,4,99).
+#
+#   End of header -----------------------------------------------------
+DELJOBDIR=true
+ARCHERR=false
+
+
+if [ "$UM_ATMOS" = "true" ]; then
+
+  if test $STEP -eq 1 || test $STEP -eq 4
+  then
+
+    RCSERVER=`cat $ERRFLAG|cut -c 1`     # return code from server
+    RMSERVER=`cat $ERRFLAG|cut -c 3-80`  # message from server
+
+    if test $AUTOPPCODE -ne 0  -o  $RCSERVER = 'T'
+    then
+
+      if [[ "$RMSERVER" = *"stoprun:"* ]]
+      then
+         # keep restart files after stopruns
+
+        if [[ "$RMSERVER" = *"User"* ]]
+        then        # user stoprun
+           mkdir $HOME/umui_runs/startinfo
+           mv $OPSTARTDIR/"$RUNID"-"$SUBMITID" \
+                  $HOME/umui_runs/startinfo/"$RUNID"-"$SUBMITID"
+           DELJOBDIR=false
+           rm $RESUB_FILE
+        else        # operator stoprun
+           mv $OPSTARTDIR/"$RUNID"-"$SUBMITID" \
+                  $OPSTOPRUN/"$RUNID"-"$SUBMITID"
+           DELJOBDIR=false
+           rm $RESUB_FILE
+        fi
+
+      else          # archiving error
+        ARCHERR=true
+        DELJOBDIR=false
+        if test $TYPE = 'CRUN' and $AUTO_RESTART = 'true'
+        then
+          echo "Archiving failure:restart file moved to $OPARCHERR"
+          mv $OPSTARTDIR/"$RUNID"* $OPARCHERR
+        fi
+      fi
+    fi
+    rm -f $OPSTARTDIR/$RUNID-$SUBMITID
+  fi
+fi # Check for UM run
+
+if test $STEP -eq 1 || test $STEP -eq 2 \
+         || test $STEP -eq 4 || test $STEP -eq 99
+then
+  if test -f $RESUB_FILE
+  then
+    # Resubmit automatically-resubmitting runs if requested
+    DELJOBDIR=false
+    $RESUB_FILE
+    rm $RESUB_FILE
+  fi
+fi
+
+if [ "$DELJOBDIR" = true ]
+then
+  if [ "$ARCHERR" = false ] && [ "$RCMASTER" -eq 0 ]
+  then
+    # remove job directory if there are no model or archive errors
+    rm -r $HOME/umui_runs/$RUNID*
+  fi
+fi

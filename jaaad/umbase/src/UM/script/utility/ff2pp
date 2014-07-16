@@ -1,0 +1,645 @@
+#!/usr/bin/perl
+# *****************************COPYRIGHT******************************
+# (C) Crown copyright Met Office. All rights reserved.
+# For further details please refer to the file COPYRIGHT.txt
+# which you should have received as part of this distribution.
+# *****************************COPYRIGHT******************************
+#
+# Code Owner: W Roseblade
+#
+#
+# Script: ff2pp
+#
+# Description: ff2pp converts a file from 64 bit UMFF format
+#              to 32 bit PP format and can transfer the result
+#              to a remote host.
+#              The file or destination argument is either
+#              a remote file name of the form "rname@rhost:path",
+#              or a local file name. If a remote file then the
+#              conversion is done remotely, otherwise locally.
+#              This script now uses ssh and scp. Please ensure that
+#              you have set up ssh to work for your required systems.
+#
+# Error Checking: stdout, stderr and the return code are all
+#                 captured to ensure any error is displayed to
+#                 to the user.
+#
+# Options:
+#
+#           -transfer - only transfers file to dest (no conversion)
+#
+#           -di       - Directory containing IEEE util wrapper
+#                       defaults to either /projects/um1/vn$VRN/ibm/utils
+#                       or /home/um1/vn$VRN/tx7/utils
+#                       or /home/fr0100/frum/vn$VRN/linux/utils
+#                       depending on the conversion platform
+#
+#           -dc       - Directory containing CONVPP util wrapper
+#                       defaults to either /home/um1/vn$VRN/tx7/utils
+#                       or /home/um1/vn$VRN/tx7/utils
+#                       or /home/fr0100/frum/vn$VRN/linux/utils
+#                       depending on the conversion platform
+#
+#           -v        - UM version of executables to use (vn7.2)
+#
+#           -o        - Store output from ieee and convpp in
+#                       local file
+#
+#           -u        - Do not delete the temp files.  To see
+#                       locations run with -o
+#
+#           -ltemp    - Local Temp directory (/tmp by default)
+#
+#           -rtemp    - Remote Temp directory (/scratch by default)
+#
+#           -ieee     - ieee options (see util wrapper for more
+#                                     details)
+#
+#           -convpp   - convpp options (see util wrapper for more
+#                                     details)
+#----------------------------------------------------------
+#
+# EXAMPLE USE
+#
+#
+# e.g. ff2pp -o frgg@hpc1c-r00:/data/nwp/nm/frgg/ahsrs/ahsrs.pp0 test.pp
+#      ff2pp -o frgg@tx03:/data/nwp/nm/frgg/ahsrw/ahsrw.pp0 ahsrw.pp                   
+#
+#
+# Will convert ahsrs.pp0 remotely using the default ieee and
+# convpp utilites and create a local PP file called test.pp.
+# This script passes by default -32e to ieee; 32bit and unpacks. 
+# and -32 to convpp to convert the 32bit ieee file using 32bit exec.
+# -o produces output in a local file!
+#
+#
+# ff2pp -o ahsrs.pp0 frgg@eld183:test.pp 
+#
+#
+# Will convert ahsrs.pp0 locally (NEC or IBM) using the default ieee and
+# convpp utilites and create a remote PP file on desktop called test.pp.
+# This script passes by default -32e to ieee; 32bit and unpacks. 
+# and -32 to convpp to convert the 32bit ieee file using 32bit exec.
+# -o produces output in a local file!
+#
+#
+# ff2pp -o ahsrs.pp0 test.pp
+#
+# Will convert ahsrs.pp0 locally (NEC IBM or LINUX) using the default ieee and
+# convpp utilites and create a local PP file called test.pp.
+#
+#
+# If problems exist the setting FF2PP_DEBUG will give extra info.
+# e.g.  export FF2PP_DEBUG=1
+#----------------------------------------------------------------
+
+use Getopt::Long;
+use Term::ANSIColor;
+
+$DEBUG = 0;   # Flag to turn debug statements ON (=1) or OFF (=0)
+if ($ENV{FF2PP_DEBUG}) {
+   $DEBUG=$ENV{FF2PP_DEBUG};
+}
+
+#------------------------------------------------
+# Main Program
+#------------------------------------------------
+
+
+
+if ( $#ARGV == -1) { echo_options(); }
+
+echo_options() if !GetOptions("ltemp=s", "rtemp=s",
+                            "transfer", "ieee=s",
+                            "convpp=s","o", "u",
+                            "v=s", "d=s", "di=s", "dc=s");
+
+# Get program name
+($name=$0)=~s#.*/##;
+
+# Write format for warning / error messages
+format STDOUT =
+	@*
+$err
+.
+# end of write format
+
+#-----------------------------
+# Initialise default variables
+#-----------------------------
+
+$VRN=@vn@;
+
+# Default values for either host
+$Convert=             "true";
+$RemoteUserid=        $ENV{USER};
+$IEEE_OPT=                "-32e";
+$CONVPP_OPT=              "-32";
+$IBM_UMDIR=           "/projects/um1";
+$NEC_UMDIR=           "/home/um1"; 
+$LINUX_UMDIR=         "/home/h01/frum"; 
+
+
+# Which platform am I running on?
+chomp($host=`hostname`);
+
+
+# Parse options given and set default variables
+get_options();
+
+if ($opt_transfer) {
+  # Transfer only.
+  transfer_only();
+}
+
+# Create commands for file conversion and transfer
+setup_conversion();
+
+# Do conversion, check return codes and transfer
+do_conversion();
+
+# If sucessful clean up
+clean_up(0);
+
+# End of Main Program
+#
+######################################################################
+######################################################################
+#
+# Subroutines below
+#
+#------------------------------------------------
+# Subroutine: echo_options
+#
+# Description: Prints the script's usage syntax.
+#------------------------------------------------
+sub echo_options {
+    print "$name: Error\n";
+    print "USAGE: $name [-transferonly]
+                        [-ltemp Local_temp_dir (/tmp)]
+                        [-rtemp remote_temp_dir (/scratch)] 
+                        [-ieee \"options\" ()]
+                        [-convpp \"options\" ()]
+                        [-o request output from conversion]
+                        [-u do not delete the temp files]
+                        [-v UM_version]
+                        [-di ieee exec_directory]
+                        [-dc convpp exec_directory]
+                        file
+                        destination\n";
+    exit 1;
+}
+
+#------------------------------------------------
+# Subroutine: get_options
+#
+# Sort options and setup default values for the
+#  local machine and the remote machine.
+#------------------------------------------------
+
+sub get_options {
+
+  if ($opt_v) { $VRN=$opt_v; }
+  if ($opt_ieee) {$IEEE_OPT=$opt_ieee}
+  if ($opt_convpp) {$CONVPP_OPT=$opt_convpp}
+
+  # Default Vaules for this local machine
+
+  if ($host eq "c1l0203-e") {
+
+     $LocalTemp=     "/scratch";
+
+     $LocalExec_i=   "$IBM_UMDIR/vn$VRN/ibm/utils";
+     $LocalExec_c=   "$IBM_UMDIR/vn$VRN/ibm/utils";
+     $UMDIRH=         "$IBM_UMDIR";
+     $SETUP_SPECIAL=   "";
+
+  } elsif ($host eq "tx01" || $host eq "tx03") {
+
+     $LocalTemp=     "/scratch";
+
+     $LocalExec_i=   "$NEC_UMDIR/vn$VRN/tx7/utils";
+     $LocalExec_c=   "$NEC_UMDIR/vn$VRN/tx7/utils";
+     $UMDIRH=        "$NEC_UMDIR";
+     $SETUP_SPECIAL=   "";
+     
+  } else {
+
+     $LocalTemp=     "/tmp";
+     
+     $LocalExec_i=   "$LINUX_UMDIR/vn$VRN/linux/utils";     
+     $LocalExec_c=   "$LINUX_UMDIR/vn$VRN/linux/utils";
+     $UMDIRH=        "$LINUX_UMDIR";
+     $SETUP_SPECIAL=   "ulimit -s unlimited;";
+  }
+  
+  #----------------------------------
+  # When running need to identify whether there is 
+  # a remote system involved.
+  #----------------------------------
+
+  # Get command line arguments to decide what machine remote file resides on
+  echo_options if (scalar(@ARGV) gt 4);
+  if (scalar(@ARGV) == 1) {
+    echo_options
+    printerr("Please specify name of output file.");
+    clean_up(1);
+  } else {
+      ($file,$dest)=@ARGV;
+  }
+  #--------------------------------------------
+  # Check whether file is given in scp format 
+  #  user@machine:location
+  #--------------------------------------------
+  if ($file =~ m/\@/) {
+     @content=split(/[\@:]/,$file);
+     $RemoteUserid=$content[0];
+     $RemoteHost=$content[1];
+     $RemoteLocation=$content[2];
+     $RemoteFile="true";
+  }
+  
+  if ($dest =~ m/\@/) { $RemoteDest="true"; }
+
+
+  if ($RemoteHost eq "hpc1c-r00") {
+     $RemoteTemp=    "/scratch";
+
+     $RemoteExec_i=    "$IBM_UMDIR/vn$VRN/ibm/utils";
+     $RemoteExec_c=    "$IBM_UMDIR/vn$VRN/ibm/utils";
+     $Setup=           "export TMPDIR=$RemoteTemp;"
+#                        ." export F_UFMTENDIAN=big;"
+                        ." export UMDIR=$IBM_UMDIR; export VN=$VRN;"
+                        ." export SCRATCH=/scratch";      
+     
+  } elsif ($RemoteHost eq "tx01" || $RemoteHost eq "tx03") {
+  
+
+     $RemoteTemp=    "/scratch";
+     $RemoteHost=    "tx03";
+
+     $RemoteExec_i=    "$NEC_UMDIR/vn$VRN/tx7/utils";
+     $RemoteExec_c=    "$NEC_UMDIR/vn$VRN/tx7/utils";
+     $Setup=           "export TMPDIR=$RemoteTemp;"
+                        ." export F_UFMTENDIAN=big;"
+                        ." export UMDIR=$NEC_UMDIR; export VN=$VRN;"
+                        ." export SCRATCH=/scratch";  
+
+  } else {
+  
+     $RemoteTemp=    $LocalTemp;
+     $RemoteHost=    $host;
+
+     $RemoteExec_i=    $LocalExec_i;
+     $RemoteExec_c=    $LocalExec_c;
+     $Setup=           "export TMPDIR=$RemoteTemp;"
+                        ." export F_UFMTENDIAN=big;"
+                        ." export UMDIR=$UMDIRH; export VN=$VRN;"
+                        ." export SCRATCH=$LocalTemp"; 
+                        
+  }                       
+  
+  $ErrorFile=        "$LocalTemp/hpc2Linux.$RemoteUserid.$$";
+  
+  #----------------------------------------------------
+  # Temp directory(s) specified, therefore
+  # override default.
+  #----------------------------------------------------
+  if ($opt_ltemp) { $LocalTemp=$opt_ltemp; }
+
+  if ($opt_rtemp) { $RemoteTemp=$opt_rtemp; }
+
+  #----------------------------------------------------
+  # If either or both of ieee or convpp Small Execs
+  # Directories specified, override default.
+  #----------------------------------------------------
+
+   if ($opt_di) {
+       $LocalExec_i=$opt_di;
+       $RemoteExec_i=$opt_di;
+   }
+
+   if ($opt_dc) {
+       $LocalExec_c=$opt_dc;
+       $RemoteExec_c=$opt_dc;
+   }
+
+   #---------------------------------------------------
+   # DEBUG: print out getopts
+   #---------------------------------------------------
+
+  if ($DEBUG) {
+  
+     print "file=$file\n"; 
+     print "dest=$dest\n";
+
+     print "RemoteUserid=$RemoteUserid\n";
+     print "RemoteHost=$RemoteHost\n";
+     print "RemoteLocation=$RemoteLocation\n";  
+     print "RemoteFile=$RemoteFile\n";
+     print "RemoteDest=$RemoteDest\n";
+     print "LocalHost=$host\n"; 
+     print "LocalTemp=$LocalTemp\n";
+     print "RemoteTemp=$RemoteTemp\n";
+     print "RemoteHost=$RemoteHost\n";
+     print "LocalExec_i=$LocalExec_i\n";
+     print "RemoteExec_i=$RemoteExec_i\n";
+     print "LocalExec_c=$LocalExec_i\n";
+     print "RemoteExec_c=$RemoteExec_i\n";
+     print "ErrorFile=$ErrorFile\n";
+  }
+
+
+  #-------------------------------
+  # Open output file if specified
+  #-------------------------------
+  if ($opt_o) {
+     $output_file="$LocalTemp/hpc2Linux.$RemoteUserid.$$";
+     open(OUT, ">$output_file") or
+       die "Can not open $LocalTemp/hpc2Linux.$RemoteUserid.$$";
+  }
+  
+
+  # Currently both a remote file and a remote destination is not
+  # allowed.  this can be reviewed.
+
+  if ($RemoteDest && $RemoteFile) {
+    printerr("Not allowed both a remote file and a remote destination");
+    clean_up(1);
+  }
+
+
+  # Get basename from specified file as it could
+  # have a path with it
+  if ($file =~ m/\//) {
+     $base=(split(/\//,$file))[-1];
+  } else {
+     $base=$file
+  }
+
+} # End of subroutine get_options
+
+#-----------------------------------
+# Subroutine: transfer_only
+#
+# Only do a transfer (no conversion)
+#-----------------------------------
+sub transfer_only {
+
+    print "\nTransfer only: Transfering $file to $dest\n";
+    print "=================================================\n";
+    @cmd=`scp $file $dest; 2>$ErrorFile.scp; echo ret_code=\$?`;
+    check_results("scp", "scp $file $dest", \@cmd, $?, $ErrorFile.scp);
+    clean_up();
+
+} # End of subroutine transfer_only
+
+#---------------------------------------------------
+# Subroutine: setup_conversion
+#
+# Setup commands for remote/local processing of data
+# and transfer commands.
+#---------------------------------------------------
+sub setup_conversion {
+
+    $stderr_scp    ="2>$ErrorFile.scp; echo ret_code=\$?";
+
+  if ($RemoteFile) {
+
+    $ssh_command   ="ssh $RemoteHost \"$Setup; ";
+    $exec_i        ="$RemoteExec_i";
+    $exec_c        ="$RemoteExec_c";
+    $ieee_in       ="$RemoteLocation ";
+    $ieee_out      ="$RemoteTemp/$base.ieee.$$ ";
+    $convpp_out    ="$RemoteTemp/$base.convpp.$$ ";
+    $stderr_ieee   ="; echo ret_code=\\\$? \" 2>$ErrorFile.ieee";
+    $stderr_convpp ="; echo ret_code=\\\$? \" 2>$ErrorFile.convpp";
+
+    # Copy the remote file to the local system
+    $transfer_method="scp";
+    $transfer_cmd="$transfer_method "
+      . "$RemoteUserid\@$RemoteHost:$convpp_out $dest $stderr_scp\n";
+
+
+  } else {
+
+    $ssh_command    ="$Setup; $SETUP_SPECIAL";
+    $exec_i         ="$LocalExec_i";
+    $exec_c         ="$LocalExec_c";
+    $ieee_in        ="$file ";
+    $ieee_out       ="$LocalTemp/$base.ieee.$$ ";
+    $convpp_out     ="$LocalTemp/$base.convpp.$$ ";
+    $stderr_ieee    ="2>$ErrorFile.ieee; echo ret_code=\$? ";
+    $stderr_convpp  ="2>$ErrorFile.convpp; echo ret_code=\$? ";
+
+
+    if ($RemoteDest) {
+
+      # Copy the local file to the remote system
+      $transfer_method="scp";
+      $transfer_cmd="$transfer_method "
+        . "$convpp_out $dest $stderr_scp\n";
+
+
+    } else {
+
+      # Copy the local file to a local dest
+      $transfer_method="cp";
+      $transfer_cmd="$transfer_method "
+        . "$convpp_out $dest $stderr_scp\n";
+
+    }
+  }
+
+
+  # IEEE Command to convert UMFF 64bit to UMFF 32bit
+  $ieee_cmd="$ssh_command $exec_i/ieee $IEEE_OPT"
+            . " $ieee_in $ieee_out $stderr_ieee";
+
+  # CONVPP Command to convert UMFF 32bit to PP 32bit
+  $convpp_cmd="$ssh_command $exec_c/convpp $CONVPP_OPT"
+              . " $ieee_out $convpp_out $stderr_convpp";
+
+  if ($DEBUG) {
+
+     print "ieee_cmd=$ieee_cmd\n";
+     print "convpp_cmd=$convpp_cmd\n";
+     print "transfer_cmd=$transfer_cmd\n";
+
+  }
+} # End of subroutine setup_conversion
+
+#-----------------------------------------
+# Subroutine: do_conversion
+#
+# Execute Commands.  If one fails bail out.
+#-----------------------------------------
+sub do_conversion {
+
+  print "\nConverting UMFF 64bit -> UMFF 32bit using ieee\n";
+  print "==============================================\n";
+
+  @result=`$ieee_cmd`;
+  check_results("$exec_i/ieee", $ieee_cmd,
+                \@result, $?, "$ErrorFile.ieee");
+  @result=();
+
+  print "Converting UMFF 32bit -> PP 32bit using convpp\n";
+  print "==============================================\n\n";
+
+  @result=`$convpp_cmd`;
+  check_results("$exec_c/convpp", $convpp_cmd,
+                \@result, $?, "$ErrorFile.convpp");
+
+  print "Transfering $convpp_out to $dest\n";
+  print "================================\n\n";
+
+  @result=`$transfer_cmd`;
+  check_results($transfer_method, $transfer_cmd,
+                 \@result, $?, "$ErrorFile.scp");
+
+} # End of subroutine do_conversion
+
+
+
+#-----------------------------------------------------------------
+# Subroutine check_results
+#
+# Checks the return code from:
+#       the system call `cmd`
+#       the return code and the contents of stderr
+#          from the UM util (saved in the output array
+#          and the errfile)
+#
+# If error clean-up and exit
+#
+# More comments inline.
+#-----------------------------------------------------------------
+sub check_results {
+
+    my ($exec, $cmd, $output, $ret_code, $errfile) = @_;
+
+    if ($ret_code) {
+      printerr("Fatal: Unable to execute command to run $exec");
+      clean_up(1);
+    }
+
+    # Check the output returned by the command
+    # Should be in the form:
+    #  ieee stuff
+    #  ....
+    #  ret_code=0
+    #
+
+    if ($opt_o) {
+       print OUT "\nOutput from $exec\n\n";
+       print OUT "using cmd: \n$cmd\n";
+       print OUT "==========================\n\n";
+    }
+    foreach $line (@$output) {
+       if ($opt_o) { print OUT $line; }
+
+       if ($line =~ m/ret_code/) {
+         $return_code=(split(/=/, $line))[-1];
+         chomp $return_code;
+       }
+
+    }
+    if ($return_code ne 0) {
+
+      printerr("Fatal: Non-zero return code from the $exec");
+      printerr("Check the output file (or re-run with -o)");
+      print_stderr($errfile);
+      clean_up($return_code);
+
+    }
+    # Before vn6.1 the utils wrappers for each small exec
+    # always returned zero regardless of the return code
+    # from the actual exec.
+    # To get around this I save the stderr to a file and
+    # if this file has non-zero size I will flag a warning.
+
+    # Blank error file
+    if (-z "$errfile") {
+
+      print "Successful. Continuing\n\n";
+
+    # Non-zero error file. Print warning to user
+    } else {
+
+      print "\tWarning: The following was sent to stderr: \n";
+      print_stderr($errfile);
+      print "\n\tTreating as successful. Continuing\n\n";
+
+    }
+}
+
+sub print_stderr {
+
+   my $errfile = shift @_;
+
+   open (ERR, "<$errfile") or die "Unable to open error file $errfile";
+
+   foreach(<ERR>) {
+
+     # Skip blank lines
+     chomp;
+     if (/^$/) { next;}
+
+     # Error messages red
+     $err=join("",color("red"),"$_",color("reset"));
+
+     # Write format to stdout
+     write;
+
+     # Copy err to stdout file
+     print OUT ;
+   }
+
+   close(ERR);
+
+}
+#------------------------------------------------
+# Subroutine printerr
+#
+# Takes arguement(s) and prints to stdout in red
+#------------------------------------------------
+
+sub printerr {
+   my $message = shift @_;
+
+   print color("red"),
+         "\t$message\n",
+         color("reset");
+}
+
+#----------------------------------
+# Subroutine clean_up
+#
+# Remove temps files before exit.
+# Displays location of output file
+# if requested
+#----------------------------------
+
+sub clean_up {
+
+  # Return code
+  my $returncode = shift @_;
+
+  # Delete temp files if ! -u
+
+  if (!$opt_u) {
+     unlink "$ErrorFile.scp";
+     unlink "$ErrorFile.ieee";
+     unlink "$ErrorFile.convpp";
+   }
+
+  # Display location of output file
+  if ($opt_o) {
+    close(OUT);
+    print "Output from conversion in,$output_file\n";
+  }
+  # Call exit
+  print "Program $name finished.\n";
+  exit $returncode;
+}
