@@ -1,37 +1,18 @@
-#!/bin/python
+#!/usr/bin/python
 
-def TestSuite_build:
-###############################################################################
-   
-   # Execute Applications 
-   
-   print "\nSet up structure for building/running all Apps described in " + \
-   "config file. These will be cleaned up following execution of the TestSuite"
+#import python modules
+import os
+import sys
+import subprocess
 
-   cwd = os.getcwd()
-   root = cwd + '/TestSuiteApps'
-   src = root + '/src' 
-   bin = root + '/bin'
-   run = root + '/Run'
-   binSerial = bin + '/Serial'
-   binParallel= bin + '/Parallel'
-   binUM = bin + '/UM'
-   trunk = src + '/trunk'
-   UM = trunk + '/UM'
-   offline = trunk + '/offline'
-   UMrun = 'jaaad-191222944'
-   UMsrc = 'jaaad'
-   
-   #Start with a clean slate
-   cmd = ("/bin/rm -fr " + root + " log" ) 
-   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-   cmd = ("/bin/rm -fr /home/599/jxs599/umui_runs/" + UMrun ) 
-   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-   cmd = ("/bin/rm -fr /short/p66/jxs599/" + UMsrc ) 
-   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-   cmd = ("/bin/rm -fr /short/p66/jxs599/UM_ROUTDIR/jxs599/" + UMsrc ) 
-   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+#import local, application specific modules
+from TestSuite_dirs import cwd, root, src, bin, run, binSerial, binParallel 
+from TestSuite_dirs import binUM, trunk, UM, offline, UMrun, UMsrc, SVNURL
+
+def TestSuite_builder( cfg ):
+
 ###############################################################################
+
    # mkdir structure
    print "mkdir structure\n"
    cmd = ("/bin/mkdir -p " + root ) 
@@ -53,7 +34,7 @@ def TestSuite_build:
       cmd = ("/bin/mkdir -p " + run + "/" + cfg.path[i] ) 
       p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
                
-###############################################################################
+################################################################################
 
    # checkout trunk (or URL to test - remove hardwiring)
    os.chdir(src)
@@ -84,7 +65,6 @@ def TestSuite_build:
    os.chdir(offline)
    
    # serial version
-   #load netcdf in build script 
    cmd = ("./build.ksh >> " + cwd + "/log" ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
 
@@ -129,4 +109,20 @@ def TestSuite_build:
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
    
    #subprocess.call("ls")
+
+################################################################################
+
+def CleanSlate():   
+   cmd = ("/bin/rm -fr " + root + " log" ) 
+   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+   cmd = ("/bin/rm -fr /home/599/jxs599/umui_runs/" + UMrun ) 
+   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+   cmd = ("/bin/rm -fr /short/p66/jxs599/" + UMsrc ) 
+   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+   cmd = ("/bin/rm -fr /short/p66/jxs599/UM_ROUTDIR/jxs599/" + UMsrc ) 
+   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+
+################################################################################
+
+
 

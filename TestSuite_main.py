@@ -12,21 +12,25 @@ import subprocess
 
 #import local, application specific modules
 from TestSuite_input import Locate_cfg, Configfile_interpreter
-#from TestSuite_build import TestSuite_build 
+from TestSuite_build import TestSuite_builder, CleanSlate 
+from TestSuite_run import TestSuite_runner 
 #from TestSuite_run import TestSuite_run 
 
 def main(argv):
-   SVNURL = "https://trac.nci.org.au/svn/cable/trunk"    
+
    # insert a break from the CLI for reading
    print "\n"
    
 ###############################################################################
+   
    # Locate config file (ifile), log file (ofile)
+   # Defaults to using default.cfg as input, default.out as output (currently no output) 
    ifile = [] 
    ofile = []
    Locate_cfg( argv, ifile, ofile )
    
 ###############################################################################
+
    # Read config file
    
    # class to hold all config file input
@@ -54,180 +58,34 @@ def main(argv):
    print "\nSet up structure for building/running all Apps described in " + \
    "config file. These will be cleaned up following execution of the TestSuite"
 
-   cwd = os.getcwd()
-   root = cwd + '/TestSuiteApps'
-   src = root + '/src' 
-   bin = root + '/bin'
-   run = root + '/Run'
-   binSerial = bin + '/Serial'
-   binParallel= bin + '/Parallel'
-   binUM = bin + '/UM'
-   trunk = src + '/trunk'
-   UM = trunk + '/UM'
-   offline = trunk + '/offline'
-   UMrun = 'jaaad-191222944'
-   UMsrc = 'jaaad'
+   #Start with a clean slate
+   CleanSlate()
 
-################################################################################
-#   
-#   #Start with a clean slate
-#   cmd = ("/bin/rm -fr " + root + " log" ) 
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#   cmd = ("/bin/rm -fr /home/599/jxs599/umui_runs/" + UMrun ) 
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#   cmd = ("/bin/rm -fr /short/p66/jxs599/" + UMsrc ) 
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#   cmd = ("/bin/rm -fr /short/p66/jxs599/UM_ROUTDIR/jxs599/" + UMsrc ) 
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-################################################################################
-#
-#   # mkdir structure
-#   print "mkdir structure\n"
-#   cmd = ("/bin/mkdir -p " + root ) 
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#   cmd = ("/bin/mkdir -p " + src ) 
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#   cmd = ("/bin/mkdir -p " + bin ) 
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#   cmd = ("/bin/mkdir -p " + binSerial ) 
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#   cmd = ("/bin/mkdir -p " + binParallel ) 
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#   cmd = ("/bin/mkdir -p " + binUM ) 
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#   cmd = ("/bin/mkdir -p " + run ) 
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#   
-#   for i in range( len( cfg.path ) ):   
-#      cmd = ("/bin/mkdir -p " + run + "/" + cfg.path[i] ) 
-#      p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#               
-################################################################################
-#
-#   # checkout trunk (or URL to test - remove hardwiring)
-#   os.chdir(src)
-#   #use this on raijin
-#   cmd = ("/usr/bin/svn co " + SVNURL ) 
-#   #jiggle
-#   #cmd = ("/opt/subversion/bin/svn co " + SVNURL ) 
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#   
-################################################################################
-#
-#   with open(cwd + "/log", "a") as myfile:
-#      myfile.write("BUILDS:\n\n") 
-#      myfile.write("Serial:\n") 
-#
-################################################################################
-#
-#   # build models
-#   print "build model\n"
-#
-#   # overwrite build scripts checked out 
-#   cmd = ("/bin/cp " + cwd + "/build.ksh " + offline ) 
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#   cmd = ("/bin/cp " + cwd + "/build_mpi.ksh " + offline ) 
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#   
-#   # offline
-#   os.chdir(offline)
-#   
-#   # serial version
-#   #load netcdf in build script 
-#   cmd = ("./build.ksh >> " + cwd + "/log" ) 
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#
-#   cmd = ("/bin/cp cable " + binSerial ) 
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#
-#   cmd = ("/bin/rm -fr .tmp" ) 
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#
-#   with open(cwd + "/log", "a") as myfile:
-#      myfile.write("\n\nParallel:\n") 
-#
-#   # parallel version
-#   cmd = ("./build_mpi.ksh >> " + cwd + "/log"  ) 
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#   
-#   cmd = ("/bin/cp cable " + binParallel ) 
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#
-#   # UM 
-#   with open(cwd + "/log", "a") as myfile:
-#      myfile.write("Build libcable first....\n\n") 
-#   os.chdir(UM)
-#   cmd = ("./build.ksh >> " + cwd + "/log" ) 
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#   
-#   with open(cwd + "/log", "a") as myfile:
-#      myfile.write("Then move to UM build....\n\n") 
-#   
-#   # cp UM runscripts to execute from
-#   cmd = ("/bin/cp -r " + cwd + "/" + UMrun + " /home/599/jxs599/umui_runs/ " ) 
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#   
-#   # cp UM Extracted src directory 
-#   cmd = ("/bin/cp -r -p " + cwd + "/" + UMsrc + " /short/p66/jxs599/UM_ROUTDIR/jxs599/ "  ) 
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#   
-#   os.chdir( "/home/599/jxs599/umui_runs/" + UMrun )
-#   
-#   # BUild UM 
-#   cmd = ("./umuisubmit_compile > " + cwd + "/um_buildlog")
-#   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-#   
-#   #subprocess.call("ls")
-################################################################################
+   # Build Applications
+   TestSuite_builder( cfg )
    
    # Run Applications
+   TestSuite_runner( cfg )
 
-   for i in range( len( cfg.path ) ):  
-      #For serial runs      
-      if(str(cfg.mode[i]) == '1'):
-         # cp executable and namelist to each rundir
-         rundir = str( run + "/" + cfg.path[i] )
-         cmd = ("/bin/cp " + binSerial + "/cable " + rundir ) 
-         p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-         cmd = ("/bin/cp " + "TestSuiteConfigs/" + cfg.path[i] + "/cable.nml " + "./" ) 
-         p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-         # GoTo rundir and execute
-         os.chdir( rundir )
-         cmd = ("./cable" ) 
-         p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-         
-      #For parallel runs      
-      if(str(cfg.mode[i]) == '2'):
-         cmd = ("/bin/cp " + binParallel + "/cable " + run + "/" + cfg.path[i] ) 
-         p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-      #For UM runs      
-      # UM executable is already in the right place         
-      if(str(cfg.mode[i]) == '3'):
-         os.chdir( "/home/599/jxs599/umui_runs/" + UMrun )
-         
-         # Run UM 
-         cmd = ("qsub umuisubmit_run > " + cwd + "/um_runlog")
-         p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-               
-   # once we have the lib we have to build the UM as well 
-
-
-   #run models
-#we may simply be able to use run.ksh here
+# we may simply be able to use run.ksh here
 # worry about qsub later. first run on a single node   
-   sys.exit()     
   
-  
+## here it may be easier to use ksh scripts   
 #   for i in range( len( cfg.name ) ):   
 #      cmd = ( "./TestSuite.ksh " +  cfg.path[i] ) 
 #      p = subprocess.check_callPopen(cmd, stdout=subprocess.PIPE, shell=True)
 #     
 # 
-## here it may be easier to use ksh scripts   
 
+
+###############################################################################
+
+   # Evaluate Success of Applications and write to ofile [default.out] 
    
    
    
+   
+#Atm_Step: Timestep                      2
    
    
 
