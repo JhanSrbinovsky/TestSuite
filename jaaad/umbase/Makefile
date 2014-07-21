@@ -1,7 +1,7 @@
 # Automatic Makefile
 
 FCM_BLD_CFG = /short/p66/jxs599/UM_ROUTDIR/jxs599/jaaad/umbase/cfg/bld.cfg
-export FCM_VERBOSE ?= 3
+export FCM_VERBOSE ?= 1
 
 export OBJECTS
 export FCM_ROOTDIR := /short/p66/jxs599/UM_ROUTDIR/jxs599/jaaad/umbase
