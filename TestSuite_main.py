@@ -53,7 +53,7 @@ def main(argv):
  
 ###############################################################################
    
-   # Execute Applications 
+   # Test Applications specified in config file 
    
    print "\nSet up structure for building/running all Apps described in " + \
    "config file. These will be cleaned up following execution of the TestSuite"

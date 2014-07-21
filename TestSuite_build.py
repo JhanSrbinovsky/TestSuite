@@ -6,8 +6,9 @@ import sys
 import subprocess
 
 #import local, application specific modules
-from TestSuite_dirs import cwd, root, src, bin, run, binSerial, binParallel 
-from TestSuite_dirs import binUM, trunk, UM, offline, UMrun, UMsrc, SVNURL
+from TestSuite_dirs import root, root_app, src, bin, run, binSerial, binParallel 
+from TestSuite_dirs import trunk, UM, offline, UMrun, UMsrc, SVNURL
+from TestSuite_dirs import TestUM, TestSerial, TestMPI 
 
 def TestSuite_builder( cfg ):
 
@@ -15,7 +16,7 @@ def TestSuite_builder( cfg ):
 
    # mkdir structure
    print "mkdir structure\n"
-   cmd = ("/bin/mkdir -p " + root ) 
+   cmd = ("/bin/mkdir -p " + root_app ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
    cmd = ("/bin/mkdir -p " + src ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
@@ -24,8 +25,6 @@ def TestSuite_builder( cfg ):
    cmd = ("/bin/mkdir -p " + binSerial ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
    cmd = ("/bin/mkdir -p " + binParallel ) 
-   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-   cmd = ("/bin/mkdir -p " + binUM ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
    cmd = ("/bin/mkdir -p " + run ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
@@ -46,7 +45,7 @@ def TestSuite_builder( cfg ):
    
 ###############################################################################
 
-   with open(cwd + "/log", "a") as myfile:
+   with open(root + "/log", "a") as myfile:
       myfile.write("BUILDS:\n\n") 
       myfile.write("Serial:\n") 
 
@@ -56,64 +55,65 @@ def TestSuite_builder( cfg ):
    print "build model\n"
 
    # overwrite build scripts checked out 
-   cmd = ("/bin/cp " + cwd + "/build.ksh " + offline ) 
+   cmd = ("/bin/cp " + root + "/build.ksh " + offline ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-   cmd = ("/bin/cp " + cwd + "/build_mpi.ksh " + offline ) 
+   cmd = ("/bin/cp " + root + "/build_mpi.ksh " + offline ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
    
    # offline
    os.chdir(offline)
    
    # serial version
-   cmd = ("./build.ksh >> " + cwd + "/log" ) 
-   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+   if TestSerial is True: 
+      cmd = ("./build.ksh >> " + root + "/log" ) 
+      p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
 
-   cmd = ("/bin/cp cable " + binSerial ) 
-   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+      cmd = ("/bin/cp cable " + binSerial ) 
+      p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
 
-   cmd = ("/bin/rm -fr .tmp" ) 
-   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+      cmd = ("/bin/rm -fr .tmp" ) 
+      p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
 
-   with open(cwd + "/log", "a") as myfile:
-      myfile.write("\n\nParallel:\n") 
+      with open(root + "/log", "a") as myfile:
+         myfile.write("\n\nParallel:\n") 
 
    # parallel version
-   cmd = ("./build_mpi.ksh >> " + cwd + "/log"  ) 
-   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-   
-   cmd = ("/bin/cp cable " + binParallel ) 
-   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+   if TestMPI is True: 
+      cmd = ("./build_mpi.ksh >> " + root + "/log"  ) 
+      p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+      
+      cmd = ("/bin/cp cable " + binParallel ) 
+      p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
 
-   # UM 
-   with open(cwd + "/log", "a") as myfile:
-      myfile.write("Build libcable first....\n\n") 
-   os.chdir(UM)
-   cmd = ("./build.ksh >> " + cwd + "/log" ) 
-   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+      # UM 
+   if TestUM is True: 
+      with open(root + "/log", "a") as myfile:
+         myfile.write("Build libcable first....\n\n") 
+      os.chdir(UM)
+      cmd = ("./build.ksh >> " + root + "/log" ) 
+      p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+      
+      with open(root + "/log", "a") as myfile:
+         myfile.write("Then move to UM build....\n\n") 
    
-   with open(cwd + "/log", "a") as myfile:
-      myfile.write("Then move to UM build....\n\n") 
+      # cp UM runscripts to execute from
+      cmd = ("/bin/cp -r " + root + "/" + UMrun + " /home/599/jxs599/umui_runs/ " ) 
+      p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+      
+      # cp UM Extracted src directory 
+      cmd = ("/bin/cp -r -p " + root + "/" + UMsrc + " /short/p66/jxs599/UM_ROUTDIR/jxs599/ "  ) 
+      p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+      
+      os.chdir( "/home/599/jxs599/umui_runs/" + UMrun )
+      
+      # BUild UM 
+      cmd = ("./umuisubmit_compile > " + root + "/um_buildlog")
+      p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
    
-   # cp UM runscripts to execute from
-   cmd = ("/bin/cp -r " + cwd + "/" + UMrun + " /home/599/jxs599/umui_runs/ " ) 
-   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-   
-   # cp UM Extracted src directory 
-   cmd = ("/bin/cp -r -p " + cwd + "/" + UMsrc + " /short/p66/jxs599/UM_ROUTDIR/jxs599/ "  ) 
-   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-   
-   os.chdir( "/home/599/jxs599/umui_runs/" + UMrun )
-   
-   # BUild UM 
-   cmd = ("./umuisubmit_compile > " + cwd + "/um_buildlog")
-   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-   
-   #subprocess.call("ls")
-
 ################################################################################
 
 def CleanSlate():   
-   cmd = ("/bin/rm -fr " + root + " log" ) 
+   cmd = ("/bin/rm -fr " + root_app + " log" ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
    cmd = ("/bin/rm -fr /home/599/jxs599/umui_runs/" + UMrun ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
