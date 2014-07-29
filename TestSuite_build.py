@@ -7,7 +7,7 @@ import subprocess
 
 #import local, application specific modules
 from TestSuite_dirs import root, root_app, src, bin, run, binSerial, binParallel 
-from TestSuite_dirs import trunk, UM, offline, UMrun, UMsrc, SVNURL
+from TestSuite_dirs import trunk, UM, offline, UMrun, UMsrc, SVNURL, cfgs
 from TestSuite_dirs import TestUM, TestSerial, TestMPI 
 
 def TestSuite_builder( cfg ):
@@ -78,11 +78,11 @@ def TestSuite_builder( cfg ):
          myfile.write("\n\nParallel:\n") 
 
    # parallel version
-   if TestMPI is True: 
+   if TestMPI is True:
       cmd = ("./build_mpi.ksh >> " + root + "/log"  ) 
       p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
       
-      cmd = ("/bin/cp cable " + binParallel ) 
+      cmd = ("/bin/cp cable-mpi " + binParallel ) 
       p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
 
       # UM 
@@ -120,6 +120,8 @@ def CleanSlate():
    cmd = ("/bin/rm -fr /short/p66/jxs599/" + UMsrc ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
    cmd = ("/bin/rm -fr /short/p66/jxs599/UM_ROUTDIR/jxs599/" + UMsrc ) 
+   p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+   cmd = ("/bin/rm -f " + root + "/*log*" ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
 
 ################################################################################

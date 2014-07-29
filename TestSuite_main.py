@@ -14,7 +14,6 @@ import subprocess
 from TestSuite_input import Locate_cfg, Configfile_interpreter
 from TestSuite_build import TestSuite_builder, CleanSlate 
 from TestSuite_run import TestSuite_runner 
-#from TestSuite_run import TestSuite_run 
 
 def main(argv):
 

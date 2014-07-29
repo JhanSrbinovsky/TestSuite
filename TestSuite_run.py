@@ -7,7 +7,7 @@ import subprocess
 
 #import local, application specific modules
 from TestSuite_dirs import root, root_app, src, bin, run, binSerial, binParallel 
-from TestSuite_dirs import trunk, UM, offline, UMrun, UMsrc, SVNURL
+from TestSuite_dirs import trunk, UM, offline, UMrun, UMsrc, SVNURL, cfgs
 from TestSuite_dirs import TestUM, TestSerial, TestMPI 
 
 def TestSuite_runner( cfg ):
@@ -27,7 +27,7 @@ def TestSuite_runner( cfg ):
 
             cmd = ("/bin/cp " + binSerial + "/cable " + rundir ) 
             p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-            cmd = ("/bin/cp " + "TestSuiteConfigs/" + cfg.path[i] + "/cable.nml " + rundir ) 
+            cmd = ("/bin/cp " + cfgs + cfg.path[i] + "/cable.nml " + rundir ) 
             p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
 
             # GoTo rundir and execute
@@ -42,14 +42,18 @@ def TestSuite_runner( cfg ):
             # cp executable and namelist to rundir
             rundir = str( run + "/" + cfg.path[i] )
 
-            cmd = ("/bin/cp " + binParallel + "/cable " + rundir ) 
+            cmd = ("/bin/cp " + binParallel + "/cable-mpi " + rundir ) 
             p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-            cmd = ("/bin/cp " + "TestSuiteConfigs/" + cfg.path[i] + "/cable.nml " + rundir ) 
+            cmd = ("/bin/cp run_cable-mpi " + rundir  ) 
             p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-
+            #cmd = ("/bin/sed \'s/RUNDIR/" + rundir + "/ \'" + cfgs + cfg.path[i] + "/run_cable-mpi" ) 
+            #p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+            cmd = ("/bin/cp " + cfgs + cfg.path[i] + "/cable.nml " + rundir ) 
+            p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+            sys.exit()
             # GoTo rundir and execute
             os.chdir( rundir )
-            cmd = ("./cable" ) 
+            cmd = ("qsub run_cable-mpi" ) 
             p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
  
       #For UM runs      

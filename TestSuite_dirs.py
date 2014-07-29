@@ -2,25 +2,28 @@
 import os
 
 ###############################################################################
-TestUM = False
-TestMPI = False
-TestSerial = True 
+TestUM = True
+TestMPI = True 
+TestSerial = True
 ###############################################################################
 
 # define dirs
 
 # branch from the CABLE repository branch to test
 SVNURL = "https://trac.nci.org.au/svn/cable/trunk"    
+# i.e. the root of your CABLE code containing UM,core, offline sub-directories
+SVNURLROOT = "/trunk"    
 
 # root of TestSuite Directory
 root = os.getcwd()
 
 # root of TestSuiteApps Directory, etc,etc
 root_app = root + '/TestSuiteApps'
-src = root + '/src' 
-bin = root + '/bin'
-run = root + '/Run'
-trunk = src + '/trunk'
+src = root_app + '/src' 
+bin = root_app + '/bin'
+run = root_app + '/Run'
+cfgs = root + '/TestSuiteConfigs/'
+trunk = src + SVNURLROOT
 UM = trunk + '/UM'
 offline = trunk + '/offline'
 
