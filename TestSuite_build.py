@@ -52,7 +52,6 @@ def TestSuite_builder( cfg ):
 ###############################################################################
 
    # build models
-   print "build model\n"
 
    # overwrite build scripts checked out 
    cmd = ("/bin/cp " + root + "/build.ksh " + offline ) 
@@ -65,12 +64,17 @@ def TestSuite_builder( cfg ):
    
    # serial version
    if TestSerial is True: 
+      print "build serial model\n"
       cmd = ("./build.ksh >> " + root + "/log" ) 
       p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
 
+      print "build serial model finished\n"
+      
       cmd = ("/bin/cp cable " + binSerial ) 
       p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
 
+      print "copied serial model to the bin/ directory\n"
+      
       cmd = ("/bin/rm -fr .tmp" ) 
       p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
 
@@ -79,11 +83,16 @@ def TestSuite_builder( cfg ):
 
    # parallel version
    if TestMPI is True:
+      print "build model\n"
       cmd = ("./build_mpi.ksh >> " + root + "/log"  ) 
       p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
       
+      print "build parallel model finished\n"
+      
       cmd = ("/bin/cp cable-mpi " + binParallel ) 
       p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+
+      print "copied parallel model to the bin/ directory\n"
 
       # UM 
    if TestUM is True: 
