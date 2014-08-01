@@ -50,7 +50,7 @@ def TestSuite_runner( cfg ):
             #p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
             cmd = ("/bin/cp " + cfgs + cfg.path[i] + "/cable.nml " + rundir ) 
             p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-            sys.exit()
+        
             # GoTo rundir and execute
             os.chdir( rundir )
             cmd = ("qsub run_cable-mpi" ) 
