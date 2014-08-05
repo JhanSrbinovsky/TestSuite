@@ -1,10 +1,10 @@
 # Automatic Makefile
 
-FCM_BLD_CFG = /short/p66/jxs599/UM_ROUTDIR/jxs599/jaaad/umrecon/cfg/bld.cfg
+FCM_BLD_CFG = /short/$PROJECT/$USER/UM_ROUTDIR/$USER/jaaad/umrecon/cfg/bld.cfg
 export FCM_VERBOSE ?= 1
 
 export OBJECTS
-export FCM_ROOTDIR := /short/p66/jxs599/UM_ROUTDIR/jxs599/jaaad/umrecon
+export FCM_ROOTDIR := /short/$PROJECT/$USER/UM_ROUTDIR/$USER/jaaad/umrecon
 export FCM_CACHEDIR := $(FCM_ROOTDIR)/.cache/.bld
 export FCM_CFGDIR := $(FCM_ROOTDIR)/cfg
 export FCM_SRCDIR := $(FCM_ROOTDIR)/src
@@ -17,7 +17,7 @@ export FCM_FLAGSDIR := $(FCM_ROOTDIR)/flags
 export FCM_INCDIR := $(FCM_ROOTDIR)/inc
 export FCM_PPSRCDIR := $(FCM_ROOTDIR)/ppsrc
 export FCM_OBJDIR := $(FCM_ROOTDIR)/obj
-FCM_ROOTDIR1 := /short/p66/jxs599/UM_ROUTDIR/jxs599/jaaad/umbase
+FCM_ROOTDIR1 := /short/$PROJECT/$USER/UM_ROUTDIR/$USER/jaaad/umbase
 FCM_CACHEDIR1 := $(FCM_ROOTDIR1)/.cache/.bld
 FCM_CFGDIR1 := $(FCM_ROOTDIR1)/cfg
 FCM_SRCDIR1 := $(FCM_ROOTDIR1)/src
@@ -71,7 +71,7 @@ export FFLAGS__UM__control__top_level__set_atm_pointers = -O0 -g -traceback -i8 
 export FFLAGS__UM__control__top_level__u_model = -g  -V -i8 -r8 -mp1 -fp-model strict -ftz -w95 -O0 -what -fno-alias -stack_temps -safe_cray_ptr
 export FPPKEYS = C_LONG_LONG_INT=c_long_long_int MPP=mpp C_LOW_U=c_low_u FRL8=frl8 LINUX=linux BUFRD_IO=bufrd_io LITTLE_END=little_end LINUX_INTEL_COMPILER=linux_intel_compiler RECON=recon CABLE_17TILES=cable_17tiles CABLE_SOIL_LAYERS=cable_soil_layers
 export LD = mpif90
-export LDFLAGS = -g  -traceback -lgcom -static-intel -L/home/599/jxs599//CABLE-AUX/UM -lcable -ldummygrib -lpsmile.MPI1 -lmct -lmpeu -lscrip -lnetcdf -lnetcdff
+export LDFLAGS = -g  -traceback -lgcom -static-intel -L/home/599/$USER//CABLE-AUX/UM -lcable -ldummygrib -lpsmile.MPI1 -lmct -lmpeu -lscrip -lnetcdf -lnetcdff
 export LD_LIBLINK = -l
 export LD_LIBSEARCH = -L
 export LD_OUTPUT = -o

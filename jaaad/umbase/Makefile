@@ -1,10 +1,10 @@
 # Automatic Makefile
 
-FCM_BLD_CFG = /short/p66/jxs599/UM_ROUTDIR/jxs599/jaaad/umbase/cfg/bld.cfg
+FCM_BLD_CFG = /short/$PROJECT/$USER/UM_ROUTDIR/$USER/jaaad/umbase/cfg/bld.cfg
 export FCM_VERBOSE ?= 1
 
 export OBJECTS
-export FCM_ROOTDIR := /short/p66/jxs599/UM_ROUTDIR/jxs599/jaaad/umbase
+export FCM_ROOTDIR := /short/$PROJECT/$USER/UM_ROUTDIR/$USER/jaaad/umbase
 export FCM_CACHEDIR := $(FCM_ROOTDIR)/.cache/.bld
 export FCM_CFGDIR := $(FCM_ROOTDIR)/cfg
 export FCM_SRCDIR := $(FCM_ROOTDIR)/src
