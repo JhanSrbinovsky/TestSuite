@@ -5,7 +5,7 @@
  
 version::UM::base    HEAD
 rdest::remote_shell  ssh
-rdest::logname       jxs599
+rdest::logname       $USER
  
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Part 1: Inherit from a Precompiled Build

@@ -66,7 +66,7 @@ CJOBN=jaaad000
 # Account ID                                      #
 ###################################################
 
-ACCOUNT=p66
+ACCOUNT=$PROJECT
 
 ###################################################
 # Number of processors for model run              #
@@ -225,7 +225,7 @@ CMEMORY=8000MB
 #PBS -q $QUEUE
 #PBS -N jaaad.compile
 #PBS -mabe -Msrb001@csiro.au
-#PBS -P p66
+#PBS -P $PROJECT
 
 # Modules for Raijin
 module use ~access/modules
@@ -271,7 +271,7 @@ fi
 #PBS -j oe
 #PBS -N jaaad.run
 #PBS -mabe -Msrb001@csiro.au
-#PBS -P p66
+#PBS -P $PROJECT
 
 # Single proc N48 requires this? much
 # ulimit -s 512000

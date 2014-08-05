@@ -4,11 +4,11 @@
 #PBS -l ncpus=16
 #PBS -l jobfs=2GB
 #PBS -q express
-#PBS -o /home/599/jxs599/um_output/jaaad000.jaaad.d14191.t222948.leave
+#PBS -o $HOME/um_output/jaaad000.jaaad.d14191.t222948.leave
 #PBS -j oe
 #PBS -N jaaad.run
 #PBS -mabe -Msrb001@csiro.au
-#PBS -P p66
+#PBS -P $PROJECT
 
 # Single proc N48 requires this? much
 # ulimit -s 512000
@@ -21,7 +21,7 @@ module load openmpi/1.6.5
 module load um
 
 
-mkdir -p $(dirname /home/599/jxs599/um_output/jaaad000.jaaad.d14191.t222948.leave)
+mkdir -p $(dirname $HOME/um_output/jaaad000.jaaad.d14191.t222948.leave)
 export STEP=4
 
 # Choose shell "set" options for  lower level scripts
@@ -39,14 +39,14 @@ export RUN_LEN_YEARS=0
 
 
 # Output file for run following compilation run.
-export UMRUN_OUTPUT=/home/599/jxs599/um_output/jaaad000.jaaad.d14191.t222948.leave
+export UMRUN_OUTPUT=$HOME//um_output/jaaad000.jaaad.d14191.t222948.leave
 export CJOBN=jaaad000
 export CRDOERUN=
 export CRPRODRUN=
-export MY_OUTPUT=/home/599/jxs599/um_output
+export MY_OUTPUT=$HOME/um_output
 export TARGET_MC=normal
 export RCF_DONE=${RCF_DONE:-false}
-export JOBDIR=/home/599/jxs599/umui_runs/jaaad-191222944
+export JOBDIR=$/umui_runs/jaaad-191222944
 export SUBMITID=191222944
 QUEUE=express
 
@@ -132,7 +132,7 @@ export OPSTARTDIR=$CPROD_ROOT/opstartinfo
 export OPSYSERR=$CPROD_ROOT/opsyserr
 export OPARCHERR=$CPROD_ROOT/oparcherr
 export CRERRDIR=$CPROD_ROOT/runerrmsg
-AC=p66
+AC=$PROJECT
 
 # allows retries of getibm and similar facilities.
 export IBM_RETRY=5   
@@ -148,11 +148,11 @@ fi
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ### START of Users top script insert           
 
-if test -f /home/599/$USER/CABLE-AUX/UM/cable_start.ksh
+if test -f $HOME/CABLE-AUX/UM/cable_start.ksh
 then
-. /home/599/$USER/CABLE-AUX/UM/cable_start.ksh
+. $HOME/CABLE-AUX/UM/cable_start.ksh
 else
-  echo "ERROR: User top script insert /home/599/$USER/CABLE-AUX/UM/cable_start.ksh not found"
+  echo "ERROR: User top script insert /home/XXX/$USER/CABLE-AUX/UM/cable_start.ksh not found"
   exit 1
 fi
 ### END of Users top script insert               
@@ -181,7 +181,7 @@ export AUSCOM_CPL=FALSE
 # ILP: table from subindep_FilDir                 #
 ###################################################
 
-export DATAOUTPUT=/short/p66
+export DATAOUTPUT=/short/$PROJECT
 export ANCILDIR=/projects/access/data/ancil/HadGEM3_cal365
 export ACCESS_ANCIL=/projects/access/data/ancil/access_v2
 export CMIP5ANCIL=/projects/access/data/ancil/CMIP5
@@ -192,11 +192,11 @@ export SO2_ANCIL=/projects/access/data/ACCESS_UM_Input/vn7.3/HGPKG2-365
 # User defined output directories                 #
 ###################################################
 
-UM_DATAW=/short/p66/$USER/$RUNID       # User-specific read/write data files
-UM_DATAM=/short/p66/$USER/$RUNID       # Output Dumps/PP/etc. Generated names
+UM_DATAW=/short/$PROJECT/$USER/$RUNID       # User-specific read/write data files
+UM_DATAM=/short/$PROJECT/$USER/$RUNID       # Output Dumps/PP/etc. Generated names
 export DATAW=$UM_DATAW
 export DATAM=$UM_DATAM   
-export UM_ROUTDIR=/short/p66/jxs599/UM_ROUTDIR/$USERID/$RUNID
+export UM_ROUTDIR=/short/$PROJECT/$USER/UM_ROUTDIR/$USERID/$RUNID
 
 # Ensure the following directories exist (o/w run-only jobs will fail)
 for dir in $UM_DATAW $UM_DATAM
@@ -286,11 +286,11 @@ LONGOUTPUT=false
 export PRINT_STATUS=${PRINT_STATUS:-PrStatus_Normal} 
 
 # load module, UM model
-export LOADMODULE=/short/p66/$USER/UM_ROUTDIR/$USER/$RUNID/ummodel/bin/$RUNID.exe    
+export LOADMODULE=/short/$PROJECT/$USER/UM_ROUTDIR/$USER/$RUNID/ummodel/bin/$RUNID.exe    
 
 
 # load module, reconfiguration
-export LOADRECON=/short/p66/$USER/$RUNID/bin/qxreconf  
+export LOADRECON=/short/$PROJECT/$USER/$RUNID/bin/qxreconf  
 
 ###################################################
 #  Model control files                            #
@@ -355,11 +355,11 @@ RC=$?
 ###################################################
 # USERS bottom script insert       start          #
 ###################################################
-if test -f /home/599/$USER/CABLE-AUX/UM/cable_end.ksh
+if test -f $HOME/CABLE-AUX/UM/cable_end.ksh
 then
-. /home/599/$USER/CABLE-AUX/UM/cable_end.ksh
+. $HOME/CABLE-AUX/UM/cable_end.ksh
 else
-  echo "ERROR: User bottom script insert /home/599/$USER/CABLE-AUX/UM/cable_end.ksh not found"
+  echo "ERROR: User bottom script insert /home/XXX/$USER/CABLE-AUX/UM/cable_end.ksh not found"
   exit 1
 fi
 ###################################################

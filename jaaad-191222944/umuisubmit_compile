@@ -3,13 +3,13 @@
 #PBS -l mem=8000MB
 # Need to make this match the number set for the build.
 #PBS -l ncpus=4
-#PBS -o /home/599/jxs599/um_output/jaaad000.jaaad.d14191.t222948.comp.leave
+#PBS -o $HOME/um_output/jaaad000.jaaad.d14191.t222948.comp.leave
 #PBS -j oe
 #PBS -l software=intel-fc/4:intel-cc/4
 #PBS -q express
 #PBS -N jaaad.compile
 #PBS -mabe -Msrb001@csiro.au
-#PBS -P p66
+#PBS -P $PROJECT
 
 # Modules for Raijin
 module use ~access/modules
@@ -27,12 +27,12 @@ module unload netcdf
 module load netcdf/4.2.1.1
 
 
-mkdir -p $(dirname /home/599/jxs599/um_output/jaaad000.jaaad.d14191.t222948.comp.leave)
+mkdir -p $(dirname $HOME/um_output/jaaad000.jaaad.d14191.t222948.comp.leave)
  
 export RUNID=jaaad
-export USERID=jxs599
-export UM_ROUTDIR=/short/p66/jxs599/UM_ROUTDIR/$USERID/$RUNID
-export UM_RDATADIR=/short/p66/$USER/$RUNID
+export USERID=$USER
+export UM_ROUTDIR=/short/$PROJECT/$USER/UM_ROUTDIR/$USERID/$RUNID
+export UM_RDATADIR=/short/$PROJECT/$USER/$RUNID
 export UM_EXENAME=$RUNID.exe
 
 # Base build

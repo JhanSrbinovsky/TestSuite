@@ -16,8 +16,8 @@
 
 export RUNID=jaaad
 export RUN_ON=raijin.nci.org.au
-export USERID=jxs599
-export UM_RDATADIR=/short/p66/$USER/$RUNID
+export USERID=$USER
+export UM_RDATADIR=/short/$PROJECT/$USER/$RUNID
 
 export UM_SVN_URL=fcm:um_br/dev/Share/VN7.3_local_changes
 export UM_SVN_BIND=$UM_SVN_URL/src/configs/bindings
@@ -68,7 +68,7 @@ RUN_FILE=umuisubmit_clr
  if test $RC -eq 0 ; then
    echo
    echo FCM_MAIN: Submitting $RUN_FILE ...
-    ssh raijin.nci.org.au -l jxs599 -n qsub -S /bin/ksh umui_runs/jaaad-$1/$RUN_FILE
+    ssh raijin.nci.org.au -l $USER -n qsub -S /bin/ksh umui_runs/jaaad-$1/$RUN_FILE
    RC=$?
    if test $RC -eq 0 ; then
      echo FCM_MAIN: Submit OK
