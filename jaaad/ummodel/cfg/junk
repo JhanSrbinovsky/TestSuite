@@ -1,0 +1,1 @@
+sed.csh:sed -i.sed 's/jxs599/$USER/' *cfg
