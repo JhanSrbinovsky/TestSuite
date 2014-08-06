@@ -8,7 +8,7 @@
 #PBS -j oe
 #PBS -N jaaad.run
 #PBS -mabe -Msrb001@csiro.au
-#PBS -P $PROJECT
+#PBS -P p66
 
 # Single proc N48 requires this? much
 # ulimit -s 512000

@@ -37,8 +37,7 @@ export UM_EXENAME=$RUNID.exe
 
 # Base build
 # ~~~~~~~~~~
-#fcm build -v 3 -f -j 4 $UM_ROUTDIR/umbase/cfg/bld.cfg
-fcm build -v 1 -j 4 $UM_ROUTDIR/umbase/cfg/bld.cfg
+fcm build -v 3 -f -j 4 $UM_ROUTDIR/umbase/cfg/bld.cfg
 
 RC=$?
 if test $RC -eq 0 ; then 
@@ -50,8 +49,7 @@ fi
 
 # Model build
 # ~~~~~~~~~~~
-#fcm build -v 3 -f -j 4 $UM_ROUTDIR/ummodel/cfg/bld.cfg
-fcm build -v 1 -j 4 $UM_ROUTDIR/ummodel/cfg/bld.cfg
+fcm build -v 3 -f -j 4 $UM_ROUTDIR/ummodel/cfg/bld.cfg
 
 RC=$?
 if test $RC -eq 0 ; then 
@@ -63,7 +61,7 @@ fi
 
 # Reconfiguration build
 # ~~~~~~~~~~~~~~~~~~~~~
-fcm build -v 1 -j 4 $UM_ROUTDIR/umrecon/cfg/bld.cfg
+fcm build -v 1 -f -j 4 $UM_ROUTDIR/umrecon/cfg/bld.cfg
 
 RC=$?
 if test $RC -eq 0 ; then 
