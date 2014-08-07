@@ -109,14 +109,14 @@ def TestSuite_builder( cfg ):
          myfile.write("Then move to UM build....\n\n") 
    
       # cp UM runscripts to execute from
-      cmd = ("/bin/cp -r " + root + "/" + UMrun + " /home/599/jxs599/umui_runs/ " ) 
+      cmd = ("/bin/cp -r " + root + "/" + UMrun + " /home/599/$USER/umui_runs/ " ) 
       p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
       
       # cp UM Extracted src directory 
-      cmd = ("/bin/cp -r -p " + root + "/" + UMsrc + " /short/p66/jxs599/UM_ROUTDIR/jxs599/ "  ) 
+      cmd = ("/bin/cp -r -p " + root + "/" + UMsrc + " /short/$PROJECT/$USER/UM_ROUTDIR/$USER/ "  ) 
       p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
       
-      os.chdir( "/home/599/jxs599/umui_runs/" + UMrun )
+      os.chdir( "/home/599/$USER/umui_runs/" + UMrun )
       
       # BUild UM 
       cmd = ("./umuisubmit_compile > " + root + "/um_buildlog")
@@ -127,11 +127,11 @@ def TestSuite_builder( cfg ):
 def CleanSlate():   
    cmd = ("/bin/rm -fr " + root_app + " log" ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-   cmd = ("/bin/rm -fr /home/599/jxs599/umui_runs/" + UMrun ) 
+   cmd = ("/bin/rm -fr /home/599/$USER/umui_runs/" + UMrun ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-   cmd = ("/bin/rm -fr /short/p66/jxs599/" + UMsrc ) 
+   cmd = ("/bin/rm -fr /short/$PROJECT/$USER/" + UMsrc ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-   cmd = ("/bin/rm -fr /short/p66/jxs599/UM_ROUTDIR/jxs599/" + UMsrc ) 
+   cmd = ("/bin/rm -fr /short/$PROJECT/$USER/UM_ROUTDIR/$USER/" + UMsrc ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
    cmd = ("/bin/rm -f " + root + "/*log*" ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
