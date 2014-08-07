@@ -59,11 +59,11 @@ def TestSuite_builder( cfg ):
    cmd = ("/bin/cp " + root + "/build_mpi.ksh " + offline ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
    
-   # offline
-   os.chdir(offline)
-   
    # serial version
    if TestSerial is True: 
+      # offline
+      os.chdir(offline)
+   
       print "build serial model\n"
       cmd = ("./build.ksh >> " + root + "/log" ) 
       p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
@@ -83,6 +83,9 @@ def TestSuite_builder( cfg ):
 
    # parallel version
    if TestMPI is True:
+      # offline
+      os.chdir(offline)
+   
       print "build model\n"
       cmd = ("./build_mpi.ksh >> " + root + "/log"  ) 
       p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)

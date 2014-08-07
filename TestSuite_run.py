@@ -44,7 +44,8 @@ def TestSuite_runner( cfg ):
 
             cmd = ("/bin/cp " + binParallel + "/cable-mpi " + rundir ) 
             p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
-            cmd = ("/bin/cp run_cable-mpi " + rundir  ) 
+           
+            cmd = ("/bin/cp " + cfgs + cfg.path[i] + "/run_cable-mpi " + rundir ) 
             p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
             #cmd = ("/bin/sed \'s/RUNDIR/" + rundir + "/ \'" + cfgs + cfg.path[i] + "/run_cable-mpi" ) 
             #p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
@@ -59,9 +60,9 @@ def TestSuite_runner( cfg ):
       #For UM runs      
       # UM executable is already in the right place         
       if(str(cfg.mode[i]) == '3'):
-         os.chdir( "/home/599/jxs599/umui_runs/" + UMrun )
          
          if TestUM is True: 
+            os.chdir( "/home/599/jxs599/umui_runs/" + UMrun )
             # Run UM 
             cmd = ("qsub umuisubmit_run > " + root + "/um_runlog")
             p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
