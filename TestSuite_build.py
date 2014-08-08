@@ -67,7 +67,7 @@ def TestSuite_builder( cfg ):
       os.chdir(offline)
    
       print "build serial model\n"
-      cmd = ("./build.ksh >> " + root + "/log" ) 
+      cmd = ("./build.ksh debug >> " + root + "/log" ) 
       p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
 
       print "build serial model finished\n"
@@ -104,7 +104,7 @@ def TestSuite_builder( cfg ):
       with open(root + "/log", "a") as myfile:
          myfile.write("Build libcable first....\n\n") 
       os.chdir(UM)
-      cmd = ("./build.ksh >> " + root + "/log" ) 
+      cmd = ("./build.ksh debug >> " + root + "/log" ) 
       p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
       
       with open(root + "/log", "a") as myfile:
