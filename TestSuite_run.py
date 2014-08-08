@@ -7,7 +7,7 @@ import subprocess
 
 #import local, application specific modules
 from TestSuite_dirs import root, root_app, src, bin, run, binSerial, binParallel 
-from TestSuite_dirs import trunk, UM, offline, UMrun, UMsrc, SVNURL, cfgs
+from TestSuite_dirs import UM, offline, UMjobScriptsHome, UMsrc, SVNURL, cfgs
 from TestSuite_dirs import TestUM, TestSerial, TestMPI 
 
 def TestSuite_runner( cfg ):
@@ -62,7 +62,7 @@ def TestSuite_runner( cfg ):
       if(str(cfg.mode[i]) == '3'):
          
          if TestUM is True: 
-            os.chdir( "/home/599/jxs599/umui_runs/" + UMrun )
+            os.chdir( UMjobScriptsHome )
             # Run UM 
             cmd = ("qsub umuisubmit_run > " + root + "/um_runlog")
             p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
