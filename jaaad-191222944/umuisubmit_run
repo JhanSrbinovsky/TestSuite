@@ -46,7 +46,7 @@ export CRPRODRUN=
 export MY_OUTPUT=$HOME/um_output
 export TARGET_MC=normal
 export RCF_DONE=${RCF_DONE:-false}
-export JOBDIR=$/umui_runs/jaaad-191222944
+export JOBDIR=$HOME/umui_runs/jaaad-191222944
 export SUBMITID=191222944
 QUEUE=express
 
