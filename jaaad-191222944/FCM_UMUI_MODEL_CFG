@@ -5,7 +5,7 @@
  
 version::UM::base    HEAD
 rdest::remote_shell  ssh
-rdest::logname       $USER
+rdest::logname       jxs599
  
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Part 1: Use Precompiled build or Base extract

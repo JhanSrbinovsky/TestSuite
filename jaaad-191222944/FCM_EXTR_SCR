@@ -4,17 +4,17 @@
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 export RUNID=jaaad
 export RUN_ON=raijin.nci.org.au
-export USERID=$USER
+export USERID=jxs599
 
 export UM_SVN_URL=fcm:um_br/dev/Share/VN7.3_local_changes
 export UM_SVN_BIND=$UM_SVN_URL/src/configs/bindings
 export UM_CONTAINER=$UM_SVN_BIND/container.cfg
 
 export UM_MAINDIR=/data/flush/srb001/UM_OUTDIR/$RUNID
-export UM_RMAINDIR=/short/$PROJECT/$USER/UM_ROUTDIR/$USERID/$RUNID
+export UM_RMAINDIR=/short/p66/jxs599/UM_ROUTDIR/$USERID/$RUNID
 export UM_RHOST=raijin.nci.org.au
 export UM_OUTDIR=/data/flush/srb001/UM_OUTDIR/$RUNID
-export UM_ROUTDIR=/short/$prOJECT/$USER/UM_ROUTDIR/$USERID/$RUNID
+export UM_ROUTDIR=/short/p66/jxs599/UM_ROUTDIR/$USERID/$RUNID
 export UM_MACHINE=nci-raijin
 export UM_VERSION=vn7.3
 
