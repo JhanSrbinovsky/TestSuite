@@ -5,8 +5,8 @@ import os
 
 # Which CABLE applications are you testing (Generally all true)
 TestUM = True 
-TestMPI = True 
-TestSerial = True
+TestMPI = False 
+TestSerial = False
 
 ###############################################################################
 
@@ -39,7 +39,7 @@ UMjobIDTimeStamp = '-191222944'
 UMjobScripts = UMjobID + UMjobIDTimeStamp
 UMjobScriptsHome = home + "/umui_runs/" + UMjobScripts
 UMrun = short + UMjobID 
-UMsrc = short + "/UM_ROUTDIR/" + UMjobID
+UMsrc = short + "/UM_ROUTDIR/" + user + "/" + UMjobID
 
 ###############################################################################
 # Users shouldn't need to touch anything blow here

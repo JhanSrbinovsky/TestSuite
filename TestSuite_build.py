@@ -60,6 +60,7 @@ def TestSuite_builder( cfg ):
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
    cmd = ("/bin/cp " + root + "/build_mpi.ksh " + offline ) 
    p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+
    
    # serial version
    if TestSerial is True: 
@@ -75,7 +76,7 @@ def TestSuite_builder( cfg ):
       cmd = ("/bin/cp cable " + binSerial ) 
       p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
 
-      print "copied serial model to the bin/ directory\n"
+      print "copied serial executable to the bin/ directory\n"
       
       cmd = ("/bin/rm -fr .tmp" ) 
       p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
@@ -83,12 +84,13 @@ def TestSuite_builder( cfg ):
       with open(root + "/log", "a") as myfile:
          myfile.write("\n\nParallel:\n") 
 
+
    # parallel version
    if TestMPI is True:
       # offline
       os.chdir(offline)
    
-      print "build model\n"
+      print "build Parallel model\n"
       cmd = ("./build_mpi.ksh >> " + root + "/log"  ) 
       p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
       
@@ -97,25 +99,30 @@ def TestSuite_builder( cfg ):
       cmd = ("/bin/cp cable-mpi " + binParallel ) 
       p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
 
-      print "copied parallel model to the bin/ directory\n"
+      print "copied parallel executable to the bin/ directory\n"
 
-      # UM 
+
+   # UM 
    if TestUM is True: 
       with open(root + "/log", "a") as myfile:
          myfile.write("Build libcable first....\n\n") 
+      
       os.chdir(UM)
-      cmd = ("./build.ksh debug >> " + root + "/log" ) 
-      p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
+      
+      #cmd = ("./build.ksh debug >> " + root + "/log" ) 
+      #p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
       
       with open(root + "/log", "a") as myfile:
          myfile.write("Then move to UM build....\n\n") 
    
       # cp UM jobscripts to execute from
       cmd = ("/bin/cp -r " + root + "/" + UMjobScripts + " " + UMjobScriptsHome ) 
+      print "Copying " + root + "/" + UMjobScripts  +" to " + UMjobScriptsHome  
+      cmd = ("/bin/cp -r " + root + "/" + UMjobScripts + " " + UMjobScriptsHome ) 
       p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
       
-      
       # cp UM Extracted src directory 
+      print "Copying " + root + "/" + UMjobID  +" to " + UMsrc
       cmd = ("/bin/cp -r -p " + root + "/" + UMjobID +  " " + UMsrc ) 
       p = subprocess.check_call(cmd, stdout=subprocess.PIPE, shell=True)
       
